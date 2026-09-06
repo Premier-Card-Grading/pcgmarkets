@@ -2,6 +2,14 @@
 
 Spec under audit: `2026-09-06-pcg-markets-design.md`. Prompt: `2026-09-06-spec-audit-prompt.md`.
 
+## Product-owner decisions — 2026-09-06 (after iteration 4)
+
+- **A-04 resolved:** Yahoo!フリマ dropped from the POC. No official Yahoo Auctions/フリマ API exists (Auctions Web API shut down 2020); aucfan corporate licence is the post-POC route. Yahoo Auctions closedsearch (robots-allowed) stays.
+- **A-26 resolved:** `ebay:active` dropped from the POC. The Card API is the sole eBay source. Removed with it: `ebay_browse` source, `last_seen_at`, `duplicate_of`, cross-source dedupe, ended-detection, eBay developer account from the spike.
+- **A-27 resolved:** number + denominator + language matching allowed (`match_method = jp_number_denom`); denominator = set card count. Ambiguity rate to be measured in the spike.
+
+No items remain open. Spec status: ready for implementation planning.
+
 ## Iteration 1 — 2026-09-06
 
 ### Findings
