@@ -2,7 +2,7 @@
   "name": "@pcg/ingest",
   "version": "0.0.1",
   "type": "module",
-  "scripts": { "start": "tsx src/cli.ts", "typecheck": "tsc --noEmit" },
+  "scripts": { "start": "tsx src/cli.ts", "test": "vitest run", "typecheck": "tsc --noEmit" },
   "dependencies": {
     "@pcg/domain": "workspace:*",
     "@pcg/db": "workspace:*",
