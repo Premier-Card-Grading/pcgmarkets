@@ -4,6 +4,10 @@ import { politeFetch } from "../http";
 import { THECARDAPI } from "./schema";
 
 function get(obj: unknown, path: string | string[]): unknown {
+  // An empty STRING path is the schema's "field absent" sentinel — must resolve to undefined,
+  // not to the whole record. An empty ARRAY path (bare-array envelope root) is a different case
+  // and must still return `obj` unchanged, so this check is on `===  ""`, not on emptiness.
+  if (path === "") return undefined;
   const parts = Array.isArray(path) ? path : path ? path.split(".") : [];
   return parts.reduce<unknown>((o, k) => (o && typeof o === "object" ? (o as Record<string, unknown>)[k] : undefined), obj);
 }
@@ -25,12 +29,16 @@ export function toRawListing(rec: unknown): RawListing | null {
   const md: Array<[keyof EbayMetadata, string]> = [["grader", f.grader], ["grade", f.grade], ["certNumber", f.certNumber], ["set", f.set], ["cardNumber", f.cardNumber], ["language", f.language]];
   for (const [k, path] of md) { const v = str(get(rec, path)); if (v) metadata[k] = v; }
   const imgs = get(rec, f.imageUrls);
-  const bestOffer = get(rec, f.bestOffer);
+  // Conservative default: treat any raw value matching THECARDAPI.bestOfferValues as a best-offer
+  // sale to exclude from pricing medians (spec §9) — see schema.ts and the research doc for why.
+  const bestOfferRaw = str(get(rec, f.bestOffer));
+  const isBestOffer = bestOfferRaw != null
+    && THECARDAPI.bestOfferValues.some((v) => v.toLowerCase() === bestOfferRaw.toLowerCase());
   return {
     source: "thecardapi", sourceItemId: id, url, title, description: null,
     price, currency: (str(get(rec, f.currency)) ?? "USD").toUpperCase(), kind: "sold",
     soldAt: soldAt.toISOString(), endedAt: soldAt.toISOString(),
-    isBestOffer: bestOffer === true || bestOffer === "true",
+    isBestOffer,
     sellerCountry: null, externalItemId: str(get(rec, f.ebayItemId)) ?? null,
     imageUrls: Array.isArray(imgs) ? imgs.map(String) : typeof imgs === "string" ? [imgs] : [],
     metadata, raw: rec,

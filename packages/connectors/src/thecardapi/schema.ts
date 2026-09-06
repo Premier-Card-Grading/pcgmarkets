@@ -23,7 +23,9 @@ export const THECARDAPI = {
     url: "listing_url",
     imageUrls: "image_url",
     ebayItemId: "", // not returned — the API exposes its own `id`, not the underlying eBay item id
-    bestOffer: "", // `listing_type` is an enum ("auction"|"fixed_price"|"best_offer"), not a boolean the mapper can read
+    // `listing_type` is a 3-way enum ("auction"|"fixed_price"|"best_offer"), not a boolean — the
+    // mapper compares its raw string value against `bestOfferValues` below (case-insensitive).
+    bestOffer: "listing_type",
     grader: "grader",
     grade: "grade",
     certNumber: "cert",
@@ -31,6 +33,14 @@ export const THECARDAPI = {
     cardNumber: "card_number",
     language: "", // not returned — no language field in the sale record
   },
+  /**
+   * Raw values at `fields.bestOffer` (`listing_type`) that mean "exclude from pricing medians"
+   * per spec §9. Our research (docs/research/2026-09-05-western-marketplaces.md) found eBay
+   * best-offer rows expose the ASKING price, not the accepted price — so `listing_type ===
+   * "best_offer"` is treated as isBestOffer=true conservatively, until/unless the vendor confirms
+   * `price` on those rows is the accepted amount rather than the asking price.
+   */
+  bestOfferValues: ["best_offer"] as string[],
   /** Paging: name of the cursor/offset param and how to read the next cursor from the response. */
   paging: { param: "cursor", nextPath: ["pagination", "next_cursor"] as string[] },
 };
