@@ -140,6 +140,39 @@ Re-read the full spec after iteration-1 edits; re-verified A-01…A-25 (all hold
 - A-26 — Defer `ebay:active` (and the eBay developer account) out of the POC.
 - A-27 — Allow number + denominator + language matching when no set code is present, or keep strict.
 
+## Iteration 4 — 2026-09-06 — CLEAN PASS
+
+Full re-read of the spec; every prior fix (A-01…A-50) re-verified; all 11 checklist items run. **Zero new BLOCKING or MAJOR findings.**
+
+### Findings
+
+- [MINOR] A-51 — eBay rule 3 did not say what happens when the `Language` aspect is missing, or how it interacts with `Set` aliases that exist in both languages (`151`) — §8
+  - Fix applied: yes — `Set` → candidates; `Language` filters only when >1; missing `Language` tolerated when `Set` is unique.
+- [MINOR] A-52 — Confidence spread ratio did not say which currency it is computed in — §9
+  - Fix applied: yes — `max_usd / min_usd`.
+- [MINOR] A-53 — GitHub Actions cron can be delayed; two runs of the same job could overlap and double-process a page (idempotent, but wasteful and confuses `connector_state`) — §7
+  - Fix applied: yes — `concurrency` group per job.
+- [MINOR] A-54 — §11 claimed "robots compliance" unconditionally while §7/§14 carry the フリマ conflict — §11
+  - Fix applied: yes — qualified.
+
+### Checked OK
+- **Item 1 — evidence:** every numeric/API/ToS claim traced to a research report; remaining unverified items are labelled as such and listed in §14. Yahoo keyword set matches research. Grade scale and rename table match pcg-company §2. eBay grader ID/category match western §0. The Card API tier limits match western table. TCGdex JA/EN id behaviour matches competitors-and-catalogs Track B.
+- **Item 2 — internal consistency:** `listing_matches.grade_label` (nullable) vs `price_points.grade_label` (sentinel) is intentional and documented; every matcher state has a row type and a UI treatment (`matched` → grid/list; `needs_review` → queue; `rejected` → health counts only; Authentication → list only); budgets: The Card API ≤4×5k/day, Browse ≈2.1k first run then ≈11+new/day, Yahoo ≤1 req/s — all inside free tiers.
+- **Item 3 — core screen:** header ← `products`⋈`sets`; grid ← `price_points` (`'any'` + tier rows); `n`/confidence ← `price_points`; sold list and chart ← `raw_listings`⋈`listing_matches`⋈`fx_rates`, filtered `duplicate_of is null`; search median ← `price_points('any','90d')`. Nothing untraceable.
+- **Item 4 — matcher hand-run** (same corpus as iteration 3, plus `PCG 9.5 Gem Mint` → 9.5, label null; `PCG Mint 9` → 9; `Gold Pristine 10` → Flawless via rename table): all route as intended.
+- **Item 5 — search:** leading zeros, spaces, promo suffix, numerator-only ranking, cert miss/timeout fallthrough, JA/EN same-number rows — all specified.
+- **Item 6 — pricing:** single reading for median (even count), input filter set, pooled vs tier, FX date rule, best-offer exclusion, confidence (now with currency), windows.
+- **Item 7 — ops:** per-connector kill switch, idempotency key, `connector_state` cursor semantics, zero-result guard, partial-page rule, `ingest_runs.status` enum, concurrency group, health page surfaces `suspect` and cursors.
+- **Item 8 — legal:** Yahoo Auctions path allowed; フリマ conflict explicit and gated off; Mercari JP excluded; seller PII stripped; images hot-linked only; TCGdex licence caveat stated.
+- **Item 9 — YAGNI:** `ebay:active` remains the only non-essential component and is an owner decision (A-26); nothing else in the spec is unreferenced.
+- **Item 10 — ambiguity:** no sentence found with two reasonable readings after A-51/A-52.
+- **Item 11 — §14:** covers every spike-resolvable unknown raised across four iterations.
+
+### Still open (needs product owner)
+- A-04 — Yahoo!フリマ robots.txt: accept deviation, active-only fallback, or drop.
+- A-26 — Defer `ebay:active` (and the eBay developer account) out of the POC.
+- A-27 — Allow number + denominator + language matching when no set code is present, or keep strict.
+
 ## Iteration 3 — 2026-09-06
 
 Re-read §5–§8 in full after iteration-2 edits; re-verified A-28…A-41; full checklist pass.

@@ -207,7 +207,7 @@ Results show image, set, printed number, language, and the pooled "PCG 10 · 90d
 | `match` | — | after each ingest | — | Skips rows with `duplicate_of` set. Routine run: listings with no `listing_matches` row + `needs_review` rows where `is_override = false`. On a `matcher_version` bump: every row where `is_override = false`, including `rejected` |
 | `prices` | — | after `match` | — | Recompute `price_points` |
 
-- GitHub Actions: one workflow, job matrix, staggered start times, secrets for API keys and Supabase service role.
+- GitHub Actions: one workflow, job matrix, staggered start times, secrets for API keys and Supabase service role. A `concurrency` group per job so a delayed cron never overlaps its own previous run.
 - Every connector is idempotent: `unique(source, source_item_id)`; re-runs never duplicate.
 - Each run writes an `ingest_runs` row.
 - Per-connector kill switch via env (`CONNECTOR_YAHOO_FURIMA=off`).
@@ -224,7 +224,7 @@ Goal: assign `(product, grade_value, grade_label)` to a listing **only when it i
 Structured fields from `metadata` (Browse `localizedAspects` + `conditionDescriptors`; The Card API equivalents where present):
 1. `Professional Grader` must equal `Premier Card Grading (PCG)` (ID 2750118). A **named other grader** (PSA, BGS, CGC, SGC, TAG, ACE…) → `rejected` with `grader_not_pcg`. `Other`, `Not Specified`, or missing → `needs_review` (`grader_missing`) — research expects sellers to pick "Other" for PCG, so these are likely PCG and must reach the queue. eBay's MIP docs define grader/grade descriptors for the Graded condition, but the research could not observe fill rates on live listings; the spike measures this (§14). The item-specific names used here (`Set`, `Card Number`, `Language`) are eBay's standard CCG aspects but were not read off a live PCG listing in the research — the spike confirms exact names.
 2. `Grade` → `grade_value`. `Authentic` → `grade_value = null`, `grade_label = 'Authentic'` (§5).
-3. `Set` + `Card Number` + `Language` → product. `Set` resolved through `sets.name_en` / `aliases`; `Card Number` run through the §6 normaliser (a numerator-only value such as `201` is acceptable once `Set` resolves); `Language` mapped `Japanese → ja`, `English → en`. Exactly one product → `matched`; zero or many → `needs_review` (`ambiguous_set` / `no_card_number`). Early Japanese sets (roughly pre-2001) carry no printed collector number — domain knowledge, not in the research; how TCGdex ids them is a §14 spike item — so those listings will land in review by design.
+3. `Set` + `Card Number` + `Language` → product. `Set` resolved through `sets.name_en` / `aliases` to candidate sets; if more than one candidate (an alias such as `151` exists in both languages), `Language` (`Japanese → ja`, `English → en`) filters them; a missing `Language` is fine when `Set` alone yields one candidate. `Card Number` run through the §6 normaliser (a numerator-only value such as `201` is acceptable once the set is known). Exactly one product → `matched`; zero or many → `needs_review` (`ambiguous_set` / `no_card_number`). Early Japanese sets (roughly pre-2001) carry no printed collector number — domain knowledge, not in the research; how TCGdex ids them is a §14 spike item — so those listings will land in review by design.
 4. `Certification Number` if present: normalise (digits only, left-pad to 9). If the PCG API returns a record → it overrides steps 2–3 (`match_method=cert`). If it returns nothing or times out (3 s) → continue with steps 2–3 as if absent; the raw value stays in `extracted.cert_raw`.
 5. Title scanned for exactly one thing: the 10-tier word (`Flawless` / `Pristine` / `Gem Mint`, plus old names per the rename table) → `grade_label`. eBay's Grade field is numeric only, so this is the only title dependency. Absent → label null (`10+` handling is in Common below).
 6. Both eBay sources: if `metadata` is empty (The Card API may return title-only rows — §14), the listing goes to `needs_review` (`no_metadata`) rather than through the JP title rules. English titles are never code-extracted.
@@ -257,7 +257,7 @@ All of set code, number, and grade present and resolving to exactly one product 
 - **Currency:** stored native; converted at the ECB rate on or before the sale date. Display shows both (`¥18,500 ($118)`).
 - **Best-offer eBay sales** (`is_best_offer`) appear in the sold list flagged "≤ $X" and are excluded from medians and counts.
 - **`ended` (active→gone) listings** are never in the grid and not shown on the card page in the POC; they exist only for later analysis.
-- **Confidence:** `high` = ≥5 sales **and** max/min < 2; `med` = 2–4 sales, **or** ≥5 sales with max/min ≥ 2; `low` = 1 sale. `n_sales = 0` → no row.
+- **Confidence:** computed on USD-converted values. `high` = ≥5 sales **and** `max_usd / min_usd` < 2; `med` = 2–4 sales, **or** ≥5 sales with the ratio ≥ 2; `low` = 1 sale. `n_sales = 0` → no row.
 - **Windows:** 30d / 90d (default) / 180d / all, measured backwards from `computed_at`.
 
 ## 10. Web app
@@ -284,7 +284,7 @@ All of set code, number, and grade present and resolving to exactly one product 
 - Kill switch per connector (env flag) so a takedown request can be honoured in one commit.
 - Listing images are linked, never copied. Only title, description, price, date, URL, and structured metadata are stored. Seller identifiers are stripped before insert (§5) — no personal data is retained (Japan APPI, GDPR for EU eBay sellers).
 - Secrets in GitHub Actions and Vercel env; Supabase service role key never reaches the browser.
-- Japan: Copyright Act Art. 30-4 covers information analysis; LY Corp terms are contractual risk only, mitigated by low rate and robots compliance. Mercari JP is excluded because of its explicit anti-scraping clause.
+- Japan: Copyright Act Art. 30-4 covers information analysis; LY Corp terms are contractual risk only, mitigated by low rate and robots compliance (Yahoo Auctions fully; Yahoo!フリマ only once the §14 decision is made). Mercari JP is excluded because of its explicit anti-scraping clause.
 
 ## 12. Testing
 
