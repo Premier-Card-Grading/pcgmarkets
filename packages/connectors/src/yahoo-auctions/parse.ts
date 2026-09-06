@@ -24,6 +24,11 @@ export function parseYahooEndTime(text: string, now: Date): Date | null {
     if (!m) return null;
     month = +m[1]!; day = +m[2]!; hour = m[3] ? +m[3] : 0; minute = m[4] ? +m[4] : 0;
   }
+  // Date.UTC silently overflows an out-of-range month/day (e.g. month=19 rolls
+  // into a wrong-but-valid later date) instead of rejecting it. Reject
+  // malformed input explicitly so a markup-drift regression that feeds this
+  // function garbage text produces null, not a silently corrupt date.
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
   const nowJst = new Date(now.getTime() + JST_OFFSET_MIN * 60000);
   let year = nowJst.getUTCFullYear();
   if (month > nowJst.getUTCMonth() + 1 || (month === nowJst.getUTCMonth() + 1 && day > nowJst.getUTCDate() + 1)) year -= 1;
