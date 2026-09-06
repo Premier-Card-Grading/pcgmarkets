@@ -1,0 +1,12 @@
+{
+  "name": "@pcg/ingest",
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": { "start": "tsx src/cli.ts", "typecheck": "tsc --noEmit" },
+  "dependencies": {
+    "@pcg/domain": "workspace:*",
+    "@pcg/db": "workspace:*",
+    "@pcg/connectors": "workspace:*",
+    "dotenv": "^16.4.0"
+  }
+}
