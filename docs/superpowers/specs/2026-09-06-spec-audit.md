@@ -139,3 +139,49 @@ Re-read the full spec after iteration-1 edits; re-verified A-01…A-25 (all hold
 - A-04 — Yahoo!フリマ robots.txt: accept deviation, active-only fallback, or drop.
 - A-26 — Defer `ebay:active` (and the eBay developer account) out of the POC.
 - A-27 — Allow number + denominator + language matching when no set code is present, or keep strict.
+
+## Iteration 3 — 2026-09-06
+
+Re-read §5–§8 in full after iteration-2 edits; re-verified A-28…A-41; full checklist pass.
+
+### Findings
+
+- [MAJOR] A-42 — eBay rule 1 auto-`rejected` any grader value other than PCG, including `Other` / `Not Specified`; research explicitly expects PCG sellers to pick "Other", so real PCG sales would have been hidden from the review queue — §8 — western-marketplaces §2 Q5 "expect a mix of correctly-set grader, 'Other', and blanks"
+  - Fix applied: yes — only a *named* other grader is rejected; `Other`/`Not Specified`/missing → `needs_review` (`grader_missing`).
+- [MINOR] A-43 — eBay item-specific names (`Set`, `Card Number`, `Language`) were presented as observed; research could not read any live PCG item page (403s) — §8
+  - Fix applied: yes — marked as standard-but-unconfirmed; exact names added to §14 spike.
+- [MINOR] A-44 — Cert path (eBay rule 4 and §6 search) had no behaviour for a cert that does not resolve or an API timeout — §6, §8
+  - Fix applied: yes — normalise/pad, 3 s timeout, fall through; raw value kept in `extracted.cert_raw`.
+- [MINOR] A-45 — Cross-source dedupe said the `ebay_browse` row "does not participate" but gave `match`/`prices` no way to know; both rows would be `kind=sold` — §5, §7, §9
+  - Fix applied: yes — `duplicate_of` column; `match` and `prices` skip it.
+- [MINOR] A-46 — JP set-code list was language-agnostic; EN ptcgo codes (`OBF`, `PAF`) could false-match inside Japanese titles, and a JA code with an `en` language flag had no rule — §8
+  - Fix applied: yes — code list restricted by the step-4 language; mismatch → `ambiguous_set`.
+- [MINOR] A-47 — Lot tokens were literal (`×3`, `x2`) rather than patterns; `x4`, `×10`, `3枚` would slip through — §8
+  - Fix applied: yes — regex patterns.
+- [MINOR] A-48 — `10+` hint was specified for eBay only; JP titles can carry it too, and the sentence was duplicated — §8
+  - Fix applied: yes — moved to Common, applies to both paths.
+- [MINOR] A-49 — `ingest_runs.status` values undefined although `suspect` was referenced — §5
+  - Fix applied: yes — `running` / `ok` / `failed` / `suspect`.
+- [MINOR] A-50 — Pricing input did not exclude zero/negative prices; `max/min` would divide by zero on a free listing — §9
+  - Fix applied: yes — `price > 0`.
+
+### Checked OK
+- A-28 bids ≥ 1 rule — present in §5 `kind` note and §7 row.
+- A-29 spike lookback — §13 runs daily ~10 days; consistent with decision 2.
+- A-30…A-41 — present as recorded.
+- Evidence (item 1) — no remaining claims stronger than research except those now explicitly labelled domain knowledge / spike items.
+- Budgets (item 2) — The Card API 4 runs/day × ≤5k; Browse ≈2.1k first run; Yahoo ≤1 req/s: all inside free tiers.
+- Core screen (item 3) — trace unchanged from iteration 2; `duplicate_of` now excluded at every read.
+- Matcher hand-run (item 4) on research titles: `PCG 10 Charizard ex 201/165 OBF` (eBay, grader PCG) → matched; same with grader Other → needs_review `grader_missing`; `1997 Japanese Jungle Eevee PCG 9.5` → needs_review `no_card_number` (expected); `ヒバニー AR 745/742 PCG鑑定品 Gem Mint 10` → needs_review `no_set_code` (A-27 pending); `【ポケカ デカヌチャン sv4a S PCG10 鑑定品】` → needs_review `no_card_number`; `[PCG10]【AR】M2a 212/193` → matched, label null; `[PCG10/Flawless] … M2a 212/193` → matched, Flawless; `084/PCG-P` alone → needs_review `possible_pcg_set_code`; `084/PCG-P PCG10` → matched; `PCGS MS65` → grade regex fails, `possible_pcgs`; `ナンジャモ 海外 プロモ PCG鑑定` → language en, no number → needs_review; `PCG 10 x 3` → lot.
+- Search (item 5) — unchanged; timeout added.
+- Pricing (item 6) — single reading; zero-price guard added.
+- Ops (item 7) — status enum closed; cursor/suspect/kill-switch consistent.
+- Legal (item 8) — unchanged from iteration 2.
+- YAGNI (item 9) — `confidence` removed in iteration 2; nothing else unused found.
+- Ambiguity (item 10) — cert-miss, grader-Other, duplicate exclusion, language-scoped codes resolved.
+- §14 (item 11) — aspect names added.
+
+### Still open (needs product owner)
+- A-04 — Yahoo!フリマ robots.txt: accept deviation, active-only fallback, or drop.
+- A-26 — Defer `ebay:active` (and the eBay developer account) out of the POC.
+- A-27 — Allow number + denominator + language matching when no set code is present, or keep strict.
