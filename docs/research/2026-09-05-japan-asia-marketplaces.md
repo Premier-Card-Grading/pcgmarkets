@@ -61,6 +61,18 @@
 - **Mercari** art. 900: most explicit anti-scraping language.
 - **LY Corp** 共通利用規約 Art. 14/15; Yahoo Auctions robots.txt nonetheless allows `/closedsearch/closedsearch`.
 
+## Addendum 2026-09-06 — Yahoo Japan MCP server
+
+Checked after the product owner asked whether Yahoo had opened an MCP server. Verified directly on developer.yahoo.co.jp:
+
+- **2026-08-12: "テキスト解析 MCP Server の提供を開始"** — wraps the JLP Text Analysis Web API only: 形態素解析 (morphological analysis) and 固有表現抽出 (named-entity extraction). Works with "Claude Code、Codex CLI などの MCP 対応クライアント". Guide: https://developer.yahoo.co.jp/webapi/jlp/mcp-guide.html. **No connection to Yahoo Auctions, Yahoo!フリマ, Shopping, or any price data.**
+- Yahoo Auctions changelog (https://developer.yahoo.co.jp/changelog/auctions.html): newest entry remains the 2019-10-10 re-notice of the Web API shutdown (Jan 2020). No new auctions API or MCP.
+- LY Corp news index: no 2026 item about an auctions/フリマ API or MCP.
+
+Implications:
+1. The data-source picture is unchanged — closedsearch (robots-allowed) for the POC, aucfan corporate API/MCP (法人限定) as the licensed route to ヤフオク/フリマ/Mercari sold history.
+2. **Post-POC idea:** Yahoo's text-analysis MCP (tokenizer + NER for Japanese) could replace regex for splitting C2C titles into name / set code / rarity / grade. Not in scope while the matcher is fixed-pattern-only, but it's an official, free, Japanese-native tool for exactly our messiest input.
+
 ## Recommended sources to start with
 
 1. **Yahoo!フリマ `?sold=1` + Yahoo Auctions closedsearch** — highest PCG density, SSR, sold prices. ≤1 req/s, respect robots paths, keywords `PCG鑑定品 | PCG鑑定 | PCG10 | PCG9.5`, negatives `PCG-P | PCGS`.

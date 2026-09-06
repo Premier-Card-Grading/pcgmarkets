@@ -291,7 +291,7 @@ Resolution, in order:
 
 1. **Spike (days, running ~10 days wall-clock).** Scripts, not product code. Yahoo Auctions closedsearch exposes 180 days, so 30 days is pulled directly. The Card API free tier has a **3-day lookback**, so the script runs daily for ~10 days and the 30-day figure is extrapolated. Count PCG Pokémon sales per source; sample titles into fixtures; measure eBay descriptor fill rates; check how many TCGdex sets share a `card_count` within a language (bounds the `jp_number_denom` ambiguity rate). No external accounts beyond a free The Card API key.
 2. **POC (weeks).** Monorepo scaffold → Supabase schema → TCGdex catalog sync → the two connectors → matcher → pricing → card page + search → admin queue + health → GitHub Actions cron → Vercel deploy.
-3. **After POC.** Licences (aucfan corporate API for Yahoo!フリマ + Mercari + Yahoo history; The Card API paid tier; eBay developer account + Browse API for active listings; eBay Marketplace Insights application); PCG label OCR on slab photos to turn Japanese listings into metadata-grade data; PCG pop counts on card page; One Piece; Japanese UI.
+3. **After POC.** Licences (aucfan corporate API for Yahoo!フリマ + Mercari + Yahoo history; The Card API paid tier; eBay developer account + Browse API for active listings; eBay Marketplace Insights application); PCG label OCR on slab photos to turn Japanese listings into metadata-grade data; Yahoo's テキスト解析 MCP (Japanese tokenizer/NER, launched 2026-08-12 — text analysis only, not auction data) as a smarter JP title splitter; PCG pop counts on card page; One Piece; Japanese UI.
 
 ## 14. Open questions
 
