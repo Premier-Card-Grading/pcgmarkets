@@ -1,2 +1,3 @@
-import type { Job } from "../run";
-export const yahooAuctionsJob: Job = async () => ({ items_seen: 0, items_new: 0, items_updated: 0 });
+import { yahooAuctions } from "@pcg/connectors";
+import { soldConnectorJob } from "./sold-connector";
+export const yahooAuctionsJob = soldConnectorJob(yahooAuctions);
