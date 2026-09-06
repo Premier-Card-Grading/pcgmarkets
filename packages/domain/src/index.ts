@@ -2,3 +2,5 @@ export * from "./types";
 export * from "./card-number";
 export * from "./grade";
 export * from "./jp-extract";
+export * from "./catalog-index";
+export * from "./match-jp";
