@@ -36,4 +36,31 @@ describe("runJob", () => {
     const db = fakeDb();
     expect(await runJob("yahoo:auctions", async () => ({ items_seen: 0, items_new: 0, items_updated: 0, suspect: true }), { db, env: {} })).toBe("suspect");
   });
+  it("returns failed without throwing when startRun's insert fails", async () => {
+    const db = {
+      from: () => ({
+        insert: () => ({ select: () => ({ single: async () => ({ data: null, error: { message: "insert failed" } }) }) }),
+        update: () => ({ eq: async () => ({ data: null, error: null }) }),
+      }),
+    } as unknown as import("@pcg/db").Db;
+    const job = vi.fn();
+    const r = await runJob("fx:daily", job, { db, env: {} });
+    expect(r).toBe("failed");
+    expect(job).not.toHaveBeenCalled();
+  });
+  it("returns failed without throwing when no db is given and credentials are missing", async () => {
+    const savedUrl = process.env.SUPABASE_URL;
+    const savedKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    try {
+      const job = vi.fn();
+      const r = await runJob("fx:daily", job, { env: {} });
+      expect(r).toBe("failed");
+      expect(job).not.toHaveBeenCalled();
+    } finally {
+      if (savedUrl !== undefined) process.env.SUPABASE_URL = savedUrl;
+      if (savedKey !== undefined) process.env.SUPABASE_SERVICE_ROLE_KEY = savedKey;
+    }
+  });
 });

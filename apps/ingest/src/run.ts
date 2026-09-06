@@ -10,9 +10,26 @@ export async function runJob(name: string, job: Job, opts: { db?: Db; env?: Node
   const env = opts.env ?? process.env;
   const sw = KILL_SWITCH[name];
   if (sw && env[sw] === "off") { console.log(`[${name}] skipped: ${sw}=off`); return "skipped"; }
-  const db = opts.db ?? createServiceClient();
   const log = (m: string) => console.log(`[${name}] ${m}`);
-  const runId = await startRun(db, name);
+
+  let db: Db;
+  try {
+    db = opts.db ?? createServiceClient();
+  } catch (e) {
+    const err = e instanceof Error ? { message: e.message, stack: e.stack } : { message: String(e) };
+    log(`failed: ${err.message}`);
+    return "failed";
+  }
+
+  let runId: string;
+  try {
+    runId = await startRun(db, name);
+  } catch (e) {
+    const err = e instanceof Error ? { message: e.message, stack: e.stack } : { message: String(e) };
+    log(`failed: ${err.message}`);
+    return "failed";
+  }
+
   try {
     const stats = await job({ db, log });
     const status = stats.suspect ? "suspect" : "ok";

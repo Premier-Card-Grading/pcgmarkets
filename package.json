@@ -6,7 +6,7 @@
   "scripts": {
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "ingest": "pnpm --filter @pcg/ingest start --",
+    "ingest": "tsx apps/ingest/src/cli.ts",
     "web": "pnpm --filter @pcg/web dev"
   },
   "devDependencies": {
