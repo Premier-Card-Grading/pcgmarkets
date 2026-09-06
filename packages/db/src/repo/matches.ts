@@ -7,9 +7,13 @@ export interface MatchRow extends MatchResult { rawListingId: string; matcherVer
 
 export async function loadListingsToMatch(db: Db, opts: { all: boolean }): Promise<ListingToMatch[]> {
   const base = db.from("raw_listings").select("id,source,title,description,metadata,listing_matches(state,is_override)");
-  const rows = must(await base) as Array<ListingToMatch & { listing_matches: { state: string; is_override: boolean }[] | null }>;
+  type EmbeddedMatch = { state: string; is_override: boolean };
+  const rows = must(await base) as Array<ListingToMatch & { listing_matches: EmbeddedMatch | EmbeddedMatch[] | null }>;
   return rows.filter((r) => {
-    const m = r.listing_matches?.[0];
+    // PostgREST embeds a to-one relation (raw_listing_id is unique on listing_matches) as a single
+    // object, not an array — but also tolerate an array shape in case that ever changes.
+    const raw = r.listing_matches;
+    const m = Array.isArray(raw) ? raw[0] : raw;
     if (!m) return true;
     if (m.is_override) return false;
     return opts.all ? true : m.state === "needs_review";
