@@ -1638,22 +1638,25 @@ Note: `price_usd` for USD rows relies on a `USD→USD` rate of 1 — Task 14's f
 ```markdown
 # @pcg/db
 
-Migrations are plain SQL, applied in order with psql against the Supabase connection string:
+Migrations are plain SQL, applied in order through the Supabase CLI's linked connection (Management API — no DB password needed):
 
-    for f in packages/db/migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done
+    for f in packages/db/migrations/*.sql; do supabase db query --linked -f "$f" || break; done
 
-`DATABASE_URL` is the Supabase project's direct Postgres URL (Project Settings → Database → Connection string, "URI", with your password).
+The repo is linked to project `nbemewketprkcyhewxos` (`supabase/.temp/project-ref`). Ad-hoc SQL: `supabase db query --linked "select count(*) from products"`.
 Migrations are not idempotent; apply each exactly once. Add new files as `NNNN_name.sql`.
 ```
 
-- [ ] **Step 5: Apply to the dev Supabase project and verify**
+- [ ] **Step 5: Apply to the linked Supabase project and verify**
 
 Run:
 ```bash
-for f in packages/db/migrations/*.sql; do psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$f"; done
-psql "$DATABASE_URL" -c "\dt" -c "select proname from pg_proc where proname like 'search_products%';"
+for f in packages/db/migrations/*.sql; do echo "== $f"; supabase db query --linked -f "$f" || break; done
+supabase db query --linked "select table_name from information_schema.tables where table_schema='public' order by 1"
+supabase db query --linked "select proname from pg_proc where proname like 'search_products%'"
 ```
-Expected: 9 tables listed; both functions present.
+Expected: 9 tables + 2 views listed; both functions present.
+
+Everywhere later in this plan that shows `psql "$DATABASE_URL" -c "<sql>"`, run `supabase db query --linked "<sql>"` instead (same SQL).
 
 - [ ] **Step 6: Commit**
 
@@ -3159,10 +3162,27 @@ describe.skipIf(titles.length === 0)("real titles never produce a wrong match", 
   }
 });
 ```
-Create `packages/domain/test/fixtures/catalog-sample.json` by exporting the sets and products the fixture titles refer to:
-```bash
-psql "$DATABASE_URL" -At -c "select json_build_object('sets',(select json_agg(json_build_object('id',id,'printedCode',printed_code,'language',language,'cardCount',card_count,'nameEn',name_en,'nameJa',name_ja,'aliases',aliases)) from sets),'products',(select json_agg(json_build_object('id',id,'setId',set_id,'numberNum',number_num,'numberDenom',number_denom,'numberSuffix',number_suffix,'language',language)) from products where language='ja' and set_id in (select id from sets where release_date > '2022-01-01')))" > packages/domain/test/fixtures/catalog-sample.json
+Create `packages/domain/test/fixtures/catalog-sample.json` by exporting the sets and the recent Japanese products (the ones fixture titles refer to) with `spikes/export-catalog-sample.ts`:
+```ts
+import "dotenv/config";
+import { writeFileSync } from "node:fs";
+import { createServiceClient, must } from "../packages/db/src";
+const db = createServiceClient();
+const sets = must(await db.from("sets").select("id,printed_code,language,card_count,name_en,name_ja,aliases,release_date")) as Record<string, unknown>[];
+const recentJa = new Set(sets.filter((s) => s.language === "ja" && String(s.release_date ?? "") > "2022-01-01").map((s) => s.id as string));
+const products: Record<string, unknown>[] = [];
+for (let from = 0; ; from += 1000) {
+  const page = must(await db.from("products").select("id,set_id,number_num,number_denom,number_suffix,language").eq("language", "ja").range(from, from + 999)) as Record<string, unknown>[];
+  products.push(...page.filter((p) => recentJa.has(p.set_id as string)));
+  if (page.length < 1000) break;
+}
+writeFileSync("packages/domain/test/fixtures/catalog-sample.json", JSON.stringify({
+  sets: sets.map((s) => ({ id: s.id, printedCode: s.printed_code, language: s.language, cardCount: s.card_count, nameEn: s.name_en, nameJa: s.name_ja, aliases: s.aliases ?? [] })),
+  products: products.map((p) => ({ id: p.id, setId: p.set_id, numberNum: p.number_num, numberDenom: p.number_denom, numberSuffix: p.number_suffix, language: p.language })),
+}));
+console.log(`${sets.length} sets, ${products.length} products`);
 ```
+Run: `pnpm tsx spikes/export-catalog-sample.ts`
 
 - [ ] **Step 2: Implement the match job**
 
