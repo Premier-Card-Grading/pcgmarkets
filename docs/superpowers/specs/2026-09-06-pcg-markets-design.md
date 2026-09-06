@@ -103,7 +103,7 @@ One row per distinct printing — the thing a listing is matched to.
 | language | text | `ja` / `en` |
 | image_url | text | TCGdex asset |
 
-Index: `(number_num, number_denom)`, `(set_id, number_num)`, trigram on `name_en`, `name_ja`.
+Index: `(number_num, number_denom)`, `(number_num, number_suffix)`, `(set_id, number_num)`, trigram on `name_en`, `name_ja`.
 
 ### `raw_listings`
 | column | type | notes |
@@ -115,11 +115,11 @@ Index: `(number_num, number_denom)`, `(set_id, number_num)`, trigram on `name_en
 | title | text | |
 | description | text | nullable |
 | price | numeric | native |
-| currency | text | `USD` / `JPY` |
-| kind | text | `sold` / `active` / `ended` |
+| currency | text | ISO 4217 as the source reports it (`USD`, `JPY`, `GBP`, `AUD`…) |
+| kind | text | `sold` / `active` / `ended`. `sold` requires evidence of a transaction (The Card API sold record; Yahoo Auctions ended with ≥1 bid; フリマ sold flag). Ended-without-sale is `ended` |
 | sold_at | timestamptz | nullable |
 | listed_at, ended_at | timestamptz | nullable |
-| is_best_offer | bool | eBay: accepted price unknown |
+| is_best_offer | bool | true **only** when the sale was via best offer *and* the source reports the listed price rather than the accepted price. If a source supplies the accepted price, store that price and `false` |
 | seller_country | text | nullable |
 | external_item_id | text | nullable; the marketplace's own id when the source is an aggregator (The Card API → eBay item id). Used to dedupe the same eBay item seen via `ebay_browse` and `thecardapi` |
 | image_urls | text[] | source-hosted; never re-hosted |
@@ -148,7 +148,6 @@ Derived; one row per raw listing; rebuilt by the matcher except where `is_overri
 | match_method | text | `ebay_metadata` / `cert` / `jp_codes` / `admin` |
 | review_reason | text | nullable: `no_card_number`, `no_set_code`, `ambiguous_set`, `no_grade`, `no_metadata`, `grader_missing`, `possible_pcg_set_code`, `possible_pcgs`, `lot`, `grader_not_pcg`, `other` |
 | extracted | jsonb | what the matcher managed to pull out (shown in admin) |
-| confidence | numeric | 0–1 |
 | is_override | bool | admin decision; matcher must not touch |
 | matcher_version | text | |
 | resolved_by, resolved_at | text, timestamptz | admin |
@@ -200,11 +199,11 @@ Results show image, set, printed number, language, and the pooled "PCG 10 · 90d
 |---|---|---|---|---|
 | `catalog:tcgdex` | api.tcgdex.net | weekly + manual | none stated; be polite | All Pokémon sets and cards, `ja` + `en` |
 | `ebay:sold` | The Card API | every 6h | 5k records/day, 3-day lookback | Sold, `q=(pcg,"premier card grading")&graded=true` |
-| `ebay:active` | eBay Browse API | daily | 5k calls/day | `item_summary/search` with `category_ids=183454`, `filter=conditionIds:{2750}`, `q=PCG` (≈11 calls at 200/page for ~2k listings), then **`getItem` per new listing** — `localizedAspects` and `conditionDescriptors` are only on the item response, not the summary. First run ≈2.1k calls; steady state ≈ 11 + new listings/day. Disappearance → `kind=ended` (see §5) |
-| `yahoo:auctions` | closedsearch (SSR) | every 6h | ≤1 req/s | Ended auctions via `/closedsearch/closedsearch?p=<keyword>` only — the one path robots.txt allows; no `istatus`, `n`, price or sort params. Keywords `PCG鑑定品`, `PCG鑑定`, `PCG10`, `PCG9.5`; `PCG-P` / `PCGS` hits are kept but routed to review (§8), not filtered at fetch |
+| `ebay:active` | eBay Browse API | daily | 5k calls/day | **Not user-visible in the POC** (§9, §10) — collected for later analysis only. `item_summary/search` with `category_ids=183454`, `filter=conditionIds:{2750}`, `q=PCG` (≈11 calls at 200/page for ~2k listings), then **`getItem` per new listing** — `localizedAspects` and `conditionDescriptors` are only on the item response, not the summary. First run ≈2.1k calls; steady state ≈ 11 + new listings/day. Disappearance → `kind=ended` (see §5) |
+| `yahoo:auctions` | closedsearch (SSR) | every 6h | ≤1 req/s | Ended auctions via `/closedsearch/closedsearch?p=<keyword>` only — the one path robots.txt allows; no `istatus`, `n`, price or sort params. **closedsearch lists every ended auction, including ones that got no bids** — a row is `kind=sold` only when bids ≥ 1; otherwise `kind=ended`. Keywords `PCG鑑定品`, `PCG鑑定`, `PCG10`, `PCG9.5`; `PCG-P` / `PCGS` hits are kept but routed to review (§8), not filtered at fetch |
 | `yahoo:furima` | `?sold=1` (SSR) | every 6h | ≤1 req/s | Sold items, same keywords; item page fetched for sold date. **Known conflict:** フリマ's robots.txt disallows the `sold`/`open`/`sort` params this needs (research). See §11 and §14 — product-owner decision pending |
 | `fx:daily` | frankfurter.dev | daily | free | All currencies observed → USD |
-| `match` | — | after each ingest | — | New + `needs_review` non-override listings |
+| `match` | — | after each ingest | — | Routine run: listings with no `listing_matches` row + `needs_review` rows where `is_override = false`. On a `matcher_version` bump: every row where `is_override = false`, including `rejected` |
 | `prices` | — | after `match` | — | Recompute `price_points` |
 
 - GitHub Actions: one workflow, job matrix, staggered start times, secrets for API keys and Supabase service role.
@@ -224,7 +223,7 @@ Goal: assign `(product, grade_value, grade_label)` to a listing **only when it i
 Structured fields from `metadata` (Browse `localizedAspects` + `conditionDescriptors`; The Card API equivalents where present):
 1. `Professional Grader` must equal `Premier Card Grading (PCG)` (ID 2750118). Anything else → `rejected` with `grader_not_pcg`. Missing → `needs_review` (`grader_missing`). eBay's MIP docs define grader/grade descriptors for the Graded condition, but the research could not observe fill rates on live listings — expect blanks and "Other"; the spike measures this (§14).
 2. `Grade` → `grade_value`. `Authentic` → `grade_value = null`, `grade_label = 'Authentic'` (§5).
-3. `Set` + `Card Number` + `Language` → product. `Set` resolved through `sets.name_en` / `aliases`; `Language` mapped `Japanese → ja`, `English → en`. Exactly one product → `matched`; zero or many → `needs_review` (`ambiguous_set` / `no_card_number`). Vintage Japanese cards (pre-2001 sets) have **no printed number** — these will always land in review; that is expected, not a bug.
+3. `Set` + `Card Number` + `Language` → product. `Set` resolved through `sets.name_en` / `aliases`; `Card Number` run through the §6 normaliser (a numerator-only value such as `201` is acceptable once `Set` resolves); `Language` mapped `Japanese → ja`, `English → en`. Exactly one product → `matched`; zero or many → `needs_review` (`ambiguous_set` / `no_card_number`). Early Japanese sets (roughly pre-2001) carry no printed collector number — domain knowledge, not in the research; how TCGdex ids them is a §14 spike item — so those listings will land in review by design.
 4. `Certification Number` if present → cert lookup overrides steps 2–3 (`match_method=cert`).
 5. Title scanned for exactly one thing: the 10-tier word (`Flawless` / `Pristine` / `Gem Mint`, plus old names per the rename table) → `grade_label`. eBay's Grade field is numeric only, so this is the only title dependency. Absent → label null. A `10+` token with no tier word is recorded in `extracted.tier_hint` but does **not** set a label (research: sellers sometimes mean Pristine, unconfirmed).
 6. Both eBay sources: if `metadata` is empty (The Card API may return title-only rows — §14), the listing goes to `needs_review` (`no_metadata`) rather than through the JP title rules. English titles are never code-extracted.
@@ -232,9 +231,9 @@ Structured fields from `metadata` (Browse `localizedAspects` + `conditionDescrip
 ### Japanese sources (`jp_codes`)
 No structured metadata exists on Yahoo Auctions / Yahoo!フリマ. Extraction is limited to three fixed patterns applied to title, then description:
 1. **Set code** — case-insensitive match against the closed list `sets.printed_code` (`SV1a`, `s12a`, `M2a` …), matched as a whole token (not inside another word).
-2. **Card number** — regex `(?<![\d/])(\d{1,3})\s*/\s*(\d{1,3}|[A-Z]{1,4}-P)(?![\d/])`. An alphabetic denominator (`SV-P`, `S-P`, `PCG-P`) **is** the set code for that promo era — step 1 is satisfied by it; no separate code is required.
+2. **Card number** — regex `(?<![\d/])(\d{1,3})\s*/\s*(\d{1,3}|[A-Za-z]{1,4}-P)(?![\d/])` (mixed case because of `DPt-P`). An alphabetic denominator (`SV-P`, `S-P`, `PCG-P`) **is** the set code for that promo era — step 1 is satisfied by it; no separate code is required.
 3. **Grade** — `PCG\s*(?:鑑定品?|graded)?\s*(?:gem\s*mint|pristine|flawless|mint|ジェムミント|プリスティン|フローレス)?\s*(10|9\.5|9|8\.5|8|7\.5|7|6|5|4|3|2|1)(?![\d.])`, case-insensitive. Covers `PCG10`, `PCG 9.5`, `PCG鑑定 10`, `PCG鑑定品 Gem Mint 10`, `[PCG10/Flawless]`. Tier label from the tier word if present anywhere in the title (English or katakana, old names via rename table); else null.
-4. **Language** — default `ja`. Title/description containing `英語版`, `海外版`, `English`, `EN版`, `米国版` → `en`.
+4. **Language** — default `ja`. Title/description containing `海外` (research example: "ナンジャモ 海外 プロモ PCG鑑定"), `英語`, `English`, or `EN版` → `en`.
 
 All of set code, number, and grade present and resolving to exactly one product → `matched`. Any missing or ambiguous → `needs_review` with the specific reason. Title contains `PCG-P`, `/PCG-P`, or `PCGS` **and no grade token** → `needs_review` with `possible_pcg_set_code` / `possible_pcgs` (admin confirms reject). A `PCG-P` promo that *also* has a grade token (`084/PCG-P PCG10`) is a legitimate PCG-graded card and matches normally.
 
@@ -264,9 +263,9 @@ All of set code, number, and grade present and resolving to exactly one product 
 | Route | Content |
 |---|---|
 | `/` | Search box (§6). Results: image, set, printed number, language, PCG 10 median |
-| `/card/[productId]` | Header (names EN+JA, set, number, image) · grade × price grid with `n` and confidence · window toggle · sold list (date, grade, native + USD price, source, outbound link) · price-over-time chart, one series per grade |
+| `/card/[productId]` | Header (names EN+JA, set, number, image) · grade × price grid with `n` and confidence · window toggle · sold list (date, grade, native + USD price, source, outbound link) · price-over-time chart: one series per `grade_value` (tiers of 10 are not split in the chart), points = individual sales in USD |
 | `/admin/review` | Review queue (§8) |
-| `/admin/health` | `ingest_runs` table, per-source counts: sold / matched / in queue / rejected |
+| `/admin/health` | `ingest_runs` table with `suspect` runs highlighted, `connector_state` cursors, per-source counts: sold / matched / in queue / rejected |
 
 - Card page is server-rendered from `price_points` + `listing_matches`; cached and revalidated after each `prices` run. This page is the shareable proof ("a PCG 10 of this sold for $190 last week").
 - PWA: installable manifest, offline app shell, last-viewed card pages cached. No push, no public accounts.
@@ -293,7 +292,7 @@ All of set code, number, and grade present and resolving to exactly one product 
 
 ## 13. Phasing
 
-1. **Spike (days).** Scripts, not product code: pull ~30 days from The Card API, Yahoo Auctions, Yahoo!フリマ; count PCG Pokémon sales per source; sample titles into fixtures. Decide which sources are scheduled. Register eBay developer + EPN accounts (both have rejection risk; start early).
+1. **Spike (days, running ~10 days wall-clock).** Scripts, not product code. Yahoo Auctions closedsearch exposes 180 days, so 30 days is pulled directly. The Card API free tier has a **3-day lookback**, so the script runs daily for ~10 days and the 30-day figure is extrapolated. Yahoo!フリマ has no date in the list view, so the script fetches item pages for a sample. Count PCG Pokémon sales per source; sample titles into fixtures; measure eBay descriptor fill rates. Decide which sources are scheduled. Register the eBay developer account early (rejection risk) — only needed if `ebay:active` stays in the POC (§14); EPN is not needed for the POC.
 2. **POC (weeks).** Monorepo scaffold → Supabase schema → TCGdex catalog sync → chosen connectors → matcher → pricing → card page + search → admin queue + health → GitHub Actions cron → Vercel deploy.
 3. **After POC.** Licences (aucfan corporate API, The Card API paid tier, eBay partner/Marketplace Insights application); PCG label OCR on slab photos to turn Japanese listings into metadata-grade data; active listings surfaced; PCG pop counts on card page; One Piece; Japanese UI.
 

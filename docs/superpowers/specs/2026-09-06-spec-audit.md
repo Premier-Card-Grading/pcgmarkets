@@ -78,3 +78,64 @@ Spec under audit: `2026-09-06-pcg-markets-design.md`. Prompt: `2026-09-06-spec-a
 - A-04 — Yahoo!フリマ: accept robots.txt deviation for `?sold=1`, use active-only fallback, or drop from POC?
 - A-26 — Defer `ebay:active` (and the eBay developer account) out of the POC?
 - A-27 — Allow number + denominator + language matching when no set code is present, or keep strict?
+
+## Iteration 2 — 2026-09-06
+
+Re-read the full spec after iteration-1 edits; re-verified A-01…A-25 (all hold, listed under Checked OK); full checklist pass.
+
+### Findings
+
+- [MAJOR] A-28 — Yahoo Auctions closedsearch lists *every* ended auction, including ones with zero bids; spec treated all closedsearch rows as `sold`, which would put unsold asking prices into the median — §5, §7 — japan-asia table: closedsearch returns "落札価格, end date, **bids**"
+  - Fix applied: yes — `kind=sold` only when bids ≥ 1, else `ended`; `kind` column note now states the transaction-evidence rule per source.
+- [MAJOR] A-29 — §13 spike said "pull ~30 days from The Card API"; the free tier has a **3-day lookback**, so that is impossible under decision 2 (free tiers) — §13 — western-marketplaces table: "Free 5k records/day, 3-day lookback"
+  - Fix applied: yes — spike runs daily for ~10 days and extrapolates; Yahoo Auctions (180-day window) pulled directly; フリマ sampled via item pages.
+- [MINOR] A-30 — `raw_listings.currency` note said `USD / JPY` while `fx_rates` anticipates GBP/AUD/EUR/CAD — §5
+  - Fix applied: yes — ISO 4217 as reported.
+- [MINOR] A-31 — "Vintage Japanese cards have no printed number" was stated as fact but is not in the research — §8
+  - Fix applied: yes — marked as domain knowledge; TCGdex handling already a spike item.
+- [MINOR] A-32 — JP language tokens listed `海外版` / `米国版`; the research example is bare `海外` ("ナンジャモ 海外 プロモ") and `米国版` is unsupported — §8
+  - Fix applied: yes — `海外`, `英語`, `English`, `EN版`.
+- [MINOR] A-33 — Promo-suffix regex `[A-Z]{1,4}-P` misses `DPt-P` (research era list) — §8
+  - Fix applied: yes — mixed case.
+- [MINOR] A-34 — `match` job scope ("new + needs_review") contradicted §8 Common ("version bump re-runs everything not override", which includes `rejected`) — §7, §8
+  - Fix applied: yes — routine vs version-bump scope stated in §7.
+- [MINOR] A-35 — `is_best_offer` semantics if a source reports the *accepted* price (The Card API might) were undefined; such sales would have been wrongly excluded — §5, §9
+  - Fix applied: yes — true only when accepted price is unknown.
+- [MINOR] A-36 — `listing_matches.confidence` (0–1) was never set by any rule or read by pricing; matching is binary by design — §5 (YAGNI/ambiguity)
+  - Fix applied: yes — column removed.
+- [MINOR] A-37 — Card-page chart "one series per grade" ambiguous between grade_value and grade_value×tier — §10
+  - Fix applied: yes — per `grade_value`, tiers not split, points are individual USD sales.
+- [MINOR] A-38 — No index for the promo search path `(number_num, number_suffix)` introduced in A-18 — §5
+  - Fix applied: yes.
+- [MINOR] A-39 — eBay `Card Number` aspect may be numerator-only (`201`); rule 3 did not say whether that is acceptable — §8
+  - Fix applied: yes — acceptable once `Set` resolves; normalised via §6.
+- [MINOR] A-40 — `/admin/health` did not surface `suspect` runs or `connector_state` cursors added in A-08/A-23; `ebay:active` not marked as invisible in the POC — §7, §10
+  - Fix applied: yes.
+- [SUGGESTION] A-41 — EPN registration in §13 was not needed for anything in POC scope (no affiliate links; Browse works without it per research) — §13
+  - Fix applied: yes — removed from the spike; eBay dev account tied to the A-26 decision.
+
+### Checked OK
+- A-01 `price_points` PK — `grade_label` NOT NULL with `'any'`; PK valid.
+- A-02 pooled rule — §9 and §6 agree on `'any'` = all sales at grade; tier ≥2 to show.
+- A-03 grader-mandatory claim — softened; fill rate in §14.
+- A-04 フリマ conflict — documented in §7 and §11; connector off by default; owner item.
+- A-05 ended detection — `last_seen_at`, 2 misses.
+- A-06 dedupe — `external_item_id` rule present.
+- A-07 `getItem` budget — arithmetic in §7 (≈2.1k first run < 5k).
+- A-08 `connector_state` — present; cursor rule consistent with A-23 partial-page rule.
+- A-09 JP grade regex — re-tested by hand against `PCG鑑定品 Gem Mint 10`, `[PCG10/Flawless]`, `PCG鑑定 9.5`, `PCG10`, `PCG 9.5`: all capture the numeric group; `PCG-P` does not match (hyphen breaks `\s*`).
+- A-10 promo denominator = set code — present.
+- A-11 seller PII stripped — §5 and §11 consistent.
+- A-12…A-25 — wording present as recorded in iteration 1.
+- §1, §3 vs research — no new conflicts.
+- §6 search shapes — cert fallback, promo suffix, numerator-only ranking all present; 9-digit lot number falls through.
+- §9 — median (even count), FX on/before date, confidence three-way, windows from `computed_at`: no two-reading sentences found.
+- §10 card-page trace — header ← `products`⋈`sets`; grid ← `price_points`; sold list and chart ← `raw_listings`⋈`listing_matches`⋈`fx_rates`; search median ← `price_points('any','90d')`. Authentication slabs appear in sold list only.
+- §11 legal — matches research per source; Mercari JP excluded; Yahoo Auctions path allowed; フリマ flagged.
+- §12 — fixtures include the §8 example titles; connectors fixture-tested.
+- §14 — spike list covers The Card API fields/best-offer/item id, fill rates, aspect_filter syntax, フリマ date, pagination robots, EN printed codes, vintage JP ids.
+
+### Still open (needs product owner)
+- A-04 — Yahoo!フリマ robots.txt: accept deviation, active-only fallback, or drop.
+- A-26 — Defer `ebay:active` (and the eBay developer account) out of the POC.
+- A-27 — Allow number + denominator + language matching when no set code is present, or keep strict.
