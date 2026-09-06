@@ -38,6 +38,9 @@ importers:
 
   packages/connectors:
     dependencies:
+      '@pcg/db':
+        specifier: workspace:*
+        version: link:../db
       '@pcg/domain':
         specifier: workspace:*
         version: link:../domain

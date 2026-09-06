@@ -1,0 +1,42 @@
+[
+  {
+    "id": "PMCG1",
+    "name": "拡張パック",
+    "cardCount": {
+      "total": 102,
+      "official": 102
+    }
+  },
+  {
+    "id": "PMCG2",
+    "name": "ポケモンジャングル",
+    "cardCount": {
+      "total": 48,
+      "official": 48
+    }
+  },
+  {
+    "id": "PMCG3",
+    "name": "化石の秘密",
+    "cardCount": {
+      "total": 48,
+      "official": 48
+    }
+  },
+  {
+    "id": "PMCG4",
+    "name": "ロケット団",
+    "cardCount": {
+      "total": 65,
+      "official": 65
+    }
+  },
+  {
+    "id": "PMCG5",
+    "name": "リーダーズスタジアム",
+    "cardCount": {
+      "total": 96,
+      "official": 96
+    }
+  }
+]

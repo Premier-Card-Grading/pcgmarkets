@@ -1,0 +1,37 @@
+{
+  "id": "SV1a",
+  "name": "トリプレットビート",
+  "releaseDate": "2023-03-10",
+  "cardCount": {
+    "firstEd": 0,
+    "holo": 44,
+    "normal": 59,
+    "official": 73,
+    "reverse": 0,
+    "total": 103
+  },
+  "serie": {
+    "id": "SV",
+    "name": "ポケモンカードゲーム スカーレット&バイオレット"
+  },
+  "cards": [
+    {
+      "id": "SV1a-001",
+      "image": "https://assets.tcgdex.net/ja/SV/SV1a/001",
+      "localId": "001",
+      "name": "トロピウス"
+    },
+    {
+      "id": "SV1a-002",
+      "image": "https://assets.tcgdex.net/ja/SV/SV1a/002",
+      "localId": "002",
+      "name": "タマゲタケ"
+    },
+    {
+      "id": "SV1a-003",
+      "image": "https://assets.tcgdex.net/ja/SV/SV1a/003",
+      "localId": "003",
+      "name": "モロバレル"
+    }
+  ]
+}
