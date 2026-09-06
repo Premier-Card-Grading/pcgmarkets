@@ -25,6 +25,17 @@ export function parseGradeFromText(text: string): { value: number; tierHint: "10
   return { value, tierHint };
 }
 
+/**
+ * Removes the first grade-token match (same GRADE_RE as parseGradeFromText) from text,
+ * replacing it with a space to preserve token boundaries. Used before set-code extraction
+ * so a glued grade like "PCG10"/"PCG9"/"PCG9.5" can't be mistaken for an era set code
+ * (the 2004-06 JP sets are literally coded PCG1..PCG10). GRADE_RE has no "g" flag, so
+ * this replaces only the first occurrence.
+ */
+export function stripGradeToken(text: string): string {
+  return text.replace(GRADE_RE, " ");
+}
+
 export function normalizeGradeValue(s: string | undefined): number | null | "authentic" {
   if (!s) return null;
   const t = s.trim();

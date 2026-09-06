@@ -67,7 +67,7 @@ describe("matchEbay", () => {
 
 describe("matchListing dispatch", () => {
   it("routes by source", () => {
-    expect(MATCHER_VERSION).toBe("1");
+    expect(MATCHER_VERSION).toBe("2");
     const jp = matchListing({ source: "yahoo_auc", title: "SV1a 073/073 PCG10", description: null, metadata: {}, cert: null }, catalog);
     expect(jp.matchMethod).toBe("jp_set_code");
     const eb = matchListing({ source: "thecardapi", title: "x", description: null, metadata: { grader: PCG, grade: "10", set: "OBF", cardNumber: "201" }, cert: null }, catalog);

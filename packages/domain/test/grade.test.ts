@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseGradeFromText, parseTierLabel, normalizeGradeValue } from "../src/grade";
+import { parseGradeFromText, parseTierLabel, normalizeGradeValue, stripGradeToken } from "../src/grade";
 
 describe("parseGradeFromText (spec §8 JP rule 3)", () => {
   const cases: [string, number | null][] = [
@@ -31,6 +31,25 @@ describe("parseTierLabel", () => {
     expect(parseTierLabel("PCG10 フローレス")).toBe("Flawless");
     expect(parseTierLabel("ジェムミント")).toBe("Gem Mint");
     expect(parseTierLabel("PCG 9 Mint")).toBeNull();
+  });
+});
+
+describe("stripGradeToken (recall bug: glued PCG-grade vs 2004-06 PCGn era set codes)", () => {
+  it("removes the glued grade token but keeps the surrounding set code and number text", () => {
+    const stripped = stripGradeToken("SV4a 100/190 PCG10鑑定品");
+    expect(stripped).not.toContain("PCG10");
+    expect(stripped).toContain("SV4a");
+    expect(stripped).toContain("100/190");
+  });
+
+  it("removes only the first grade match, leaving a later grade-shaped token alone", () => {
+    const stripped = stripGradeToken("PCG10 PCG9");
+    expect(stripped).not.toContain("PCG10");
+    expect(stripped).toContain("PCG9");
+  });
+
+  it("is a no-op when there is no grade token", () => {
+    expect(stripGradeToken("M2a 212/193")).toBe("M2a 212/193");
   });
 });
 

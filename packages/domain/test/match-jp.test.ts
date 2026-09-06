@@ -85,3 +85,57 @@ describe("matchJp — review routing", () => {
     expect(r.extracted).toMatchObject({ setCode: "M2a", cardNumber: null, grade: null, language: "ja" });
   });
 });
+
+// Recall bug (Task 26 smoke): the live TCGdex catalog carries the 2004-06 JP sets coded
+// PCG1..PCG10. A modern listing whose PCG grade is glued to the number — e.g.
+// "...100/190 PCG10鑑定品" — made findSetCode's whole-token, longest-match search pick up
+// the grade token "PCG10" as a (fake) era set code, since "PCG10" (5 chars) beats a real
+// code like "SV4a" (4 chars) on longest-match. That mis-extracted the set and routed a
+// legitimate listing to needs_review, emptying its price grid. Fix: strip the grade token
+// before searching for a set code.
+describe("matchJp — PCG grade token vs PCG-era set code collision (recall bug)", () => {
+  const modernSets: SetRef[] = [
+    { id: "SV4a", printedCode: "SV4a", language: "ja", cardCount: 190, nameEn: null, nameJa: "ancient roar-ish", aliases: [] },
+    { id: "PCG10", printedCode: "PCG10", language: "ja", cardCount: 88, nameEn: null, nameJa: "2004-06 era set #10", aliases: [] },
+  ];
+  const modernProducts: ProductRef[] = [
+    { id: "SV4a-100", setId: "SV4a", numberNum: 100, numberDenom: 190, numberSuffix: null, language: "ja" },
+  ];
+  const collisionCatalog = new InMemoryCatalog(modernSets, modernProducts);
+  const mc = (title: string) => matchJp({ title, description: null }, collisionCatalog);
+
+  it("glued grade PCG10 is not stolen as the era set code — matches SV4a, not needs_review", () => {
+    const r = mc("リザードン SV4a 100/190 PCG10");
+    expect(r).toMatchObject({ state: "matched", productId: "SV4a-100", matchMethod: "jp_set_code" });
+    expect(r.extracted).toMatchObject({ setCode: "SV4a" });
+    expect(r.productId).not.toBe(null);
+    expect((r.extracted as Record<string, unknown>).setCode).not.toBe("PCG10");
+  });
+
+  it("spaced grade still matches SV4a (regression — spaced grades already worked)", () => {
+    const r = mc("SV4a 100/190 PCG 9.5");
+    expect(r).toMatchObject({ state: "matched", productId: "SV4a-100", matchMethod: "jp_set_code", gradeValue: 9.5 });
+  });
+});
+
+// Genuine PCG-era set codes (PCG1..PCG10) must still resolve when the grade token is a
+// distinct, separate occurrence in the title. This is unambiguous only when the grade
+// token appears earlier in the text than the era code+number (GRADE_RE is a non-global,
+// leftmost match, and "PCGn" alone is itself grade-shaped — see stripGradeToken tests and
+// grade.ts comments for the inherent ambiguity when the era code comes first).
+describe("matchJp — genuine PCG-era set code survives grade stripping", () => {
+  const eraSets: SetRef[] = [
+    { id: "PCG1", printedCode: "PCG1", language: "ja", cardCount: 52, nameEn: null, nameJa: "2004-06 era set #1", aliases: [] },
+  ];
+  const eraProducts: ProductRef[] = [
+    { id: "PCG1-016", setId: "PCG1", numberNum: 16, numberDenom: 52, numberSuffix: null, language: "ja" },
+  ];
+  const eraCatalog = new InMemoryCatalog(eraSets, eraProducts);
+  const me = (title: string) => matchJp({ title, description: null }, eraCatalog);
+
+  it("keeps the real era set code when the grade token precedes it in the title", () => {
+    const r = me("PCG9鑑定品 PCG1 016/052");
+    expect(r).toMatchObject({ state: "matched", productId: "PCG1-016", matchMethod: "jp_set_code", gradeValue: 9 });
+    expect(r.extracted).toMatchObject({ setCode: "PCG1" });
+  });
+});

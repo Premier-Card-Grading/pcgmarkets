@@ -1,7 +1,7 @@
 import type { MatchResult, ReviewReason } from "./types";
 import type { CatalogIndex, ProductRef } from "./catalog-index";
 import { detectLanguage, findCardNumber, findSetCode, isLot, hasPcgSetCodeNoise, hasPcgsNoise } from "./jp-extract";
-import { parseGradeFromText, parseTierLabel } from "./grade";
+import { parseGradeFromText, parseTierLabel, stripGradeToken } from "./grade";
 
 const review = (reviewReason: ReviewReason, extracted: Record<string, unknown>): MatchResult => ({
   state: "needs_review", productId: null, gradeValue: null, gradeLabel: null, certId: null,
@@ -13,7 +13,12 @@ export function matchJp(input: { title: string; description: string | null }, ca
   const language = detectLanguage(text);
   const grade = parseGradeFromText(input.title) ?? parseGradeFromText(text);
   const cardNumber = findCardNumber(input.title) ?? findCardNumber(text);
-  const setCode = findSetCode(input.title, catalog.setCodes(language)) ?? findSetCode(text, catalog.setCodes(language));
+  // Strip the (first) grade token before searching for a set code — a glued modern grade
+  // like "PCG10"/"PCG9"/"PCG9.5" would otherwise be mistaken for a 2004-06 era set code
+  // (those sets are literally coded PCG1..PCG10).
+  const titleNoGrade = stripGradeToken(input.title);
+  const textNoGrade = stripGradeToken(text);
+  const setCode = findSetCode(titleNoGrade, catalog.setCodes(language)) ?? findSetCode(textNoGrade, catalog.setCodes(language));
 
   const extracted: Record<string, unknown> = {
     language, setCode, cardNumber: cardNumber?.printed ?? null,
