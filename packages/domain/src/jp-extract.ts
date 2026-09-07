@@ -33,7 +33,10 @@ export function findSetCode(text: string, codes: string[]): string | null {
   return null;
 }
 
-const LOT_RES = [/[x×]\s*\d/i, /\d\s*枚/, /まとめ/, /\blot\b/i, /\bbundle\b/i, /\d\s*セット/, /枚セット/];
+// The first pattern requires a non-letter before the "x"/"×" so it doesn't match the "x" in
+// "ex"/"EX" (a huge fraction of modern Pokemon cards, e.g. "Sylveon ex 069/187") when a card
+// number follows.
+const LOT_RES = [/(?<![A-Za-z])[x×]\s*\d/i, /\d\s*枚/, /まとめ/, /\blot\b/i, /\bbundle\b/i, /\d\s*セット/, /枚セット/];
 
 export function isLot(text: string): boolean {
   return LOT_RES.some((re) => re.test(text));

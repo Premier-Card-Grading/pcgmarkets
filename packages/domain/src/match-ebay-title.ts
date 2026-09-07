@@ -69,6 +69,11 @@ export function matchEbayTitle(input: { title: string }, catalog: CatalogIndex):
     matchMethod: "ebay_title", reviewReason: null, extracted,
   });
 
+  // Tracks whether any step below found more than one candidate — the final fallback reason
+  // is "ambiguous_set" rather than "no_set_code" when that happened, even if a later step
+  // (English set name) goes on to resolve the card.
+  let ambiguous = false;
+
   // Step 6a: explicit set code.
   if (setCode) {
     const sets = catalog.setsByCode(setCode, language);
@@ -84,12 +89,14 @@ export function matchEbayTitle(input: { title: string }, catalog: CatalogIndex):
     if (ps.length > 1) return review("ambiguous_set", extracted);
   }
 
-  // Step 6c: number + denominator (denominator = set card count).
+  // Step 6c: number + denominator (denominator = set card count). A denominator shared by
+  // multiple sets doesn't fail closed immediately — it falls through to 6d, since the English
+  // set name in the title may still disambiguate which of those sets it is.
   if (cardNumber.denom != null) {
     const sets = catalog.setsByCardCount(cardNumber.denom, language);
     const ps = sets.flatMap((s) => catalog.productsBySetAndNumber(s.id, cardNumber.num));
     if (ps.length === 1) return done(ps[0]!);
-    if (ps.length > 1) return review("ambiguous_set", extracted);
+    if (ps.length > 1) ambiguous = true;
   }
 
   // Step 6d: English set NAME fallback — resolves the SET only; the product must still
@@ -98,10 +105,10 @@ export function matchEbayTitle(input: { title: string }, catalog: CatalogIndex):
   if (nameSets.length === 1) {
     const ps = catalog.productsBySetAndNumber(nameSets[0]!.id, cardNumber.num);
     if (ps.length === 1) return done(ps[0]!);
-    if (ps.length > 1) return review("ambiguous_set", extracted);
+    if (ps.length > 1) ambiguous = true;
   } else if (nameSets.length > 1) {
-    return review("ambiguous_set", extracted);
+    ambiguous = true;
   }
 
-  return review("no_set_code", extracted);
+  return review(ambiguous ? "ambiguous_set" : "no_set_code", extracted);
 }
