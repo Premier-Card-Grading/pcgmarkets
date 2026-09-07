@@ -1,5 +1,5 @@
 export type Language = "ja" | "en";
-export type Source = "thecardapi" | "yahoo_auc";
+export type Source = "thecardapi" | "yahoo_auc" | "soldcomps";
 export type ListingKind = "sold" | "ended";
 
 /** Structured fields an eBay-derived source can provide. All optional; absent = seller left it blank. */
