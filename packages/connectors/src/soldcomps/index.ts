@@ -60,7 +60,7 @@ export const soldComps: Connector = {
 
     while (keywordIndex < SOLDCOMPS.keywords.length) {
       const keyword = SOLDCOMPS.keywords[keywordIndex]!;
-      const u = new URL(SOLDCOMPS.scrapePath, SOLDCOMPS.baseUrl);
+      const u = new URL(SOLDCOMPS.baseUrl + SOLDCOMPS.scrapePath);
       u.searchParams.set("keyword", keyword);
       u.searchParams.set("page", String(page));
       u.searchParams.set("count", String(SOLDCOMPS.count));

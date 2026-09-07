@@ -1,6 +1,6 @@
 import type { SaleRow } from "@/lib/card-data";
 import { fmtDate, fmtNative, fmtUsd, gradeLabelText } from "@/lib/format";
-const sourceName: Record<string, string> = { thecardapi: "eBay", yahoo_auc: "Yahoo! Auctions" };
+const sourceName: Record<string, string> = { thecardapi: "eBay", yahoo_auc: "Yahoo! Auctions", soldcomps: "eBay" };
 export function SoldList({ sales }: { sales: SaleRow[] }) {
   if (sales.length === 0) return null;
   return (
