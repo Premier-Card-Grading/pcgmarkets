@@ -123,15 +123,26 @@ describe("soldComps.fetchSold (synthetic: mocked fetch)", () => {
     process.env.SOLDCOMPS_KEY = "sc_test";
     _resetForTests();
     const callsPerKeyword: Record<string, number> = {};
-    vi.stubGlobal("fetch", vi.fn(async (url: string | URL) => {
+    const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
       const kw = new URL(url).searchParams.get("keyword")!;
       callsPerKeyword[kw] = (callsPerKeyword[kw] ?? 0) + 1;
       return mockJsonResponse({ items: [fakeItem(`${kw}-1`)], hasNextPage: false });
-    }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     for await (const _page of soldComps.fetchSold(null)) { /* drain */ }
 
     for (const kw of SOLDCOMPS.keywords) expect(callsPerKeyword[kw]).toBe(1);
+
+    // Regression guard: the request URL must hit the real SoldComps endpoint
+    // (https://api.sold-comps.com/v1/scrape?...). A prior bug built the URL as
+    // `new URL(scrapePath, baseUrl)`, which — because scrapePath is an absolute
+    // path — silently discarded baseUrl's own "/v1" path segment and requested
+    // https://api.sold-comps.com/scrape instead, 404ing on every live call.
+    const firstCallUrl = String(fetchMock.mock.calls[0]![0]);
+    expect(firstCallUrl).toMatch(/^https:\/\/api\.sold-comps\.com\/v1\/scrape\?/);
+    const firstCallInit = fetchMock.mock.calls[0]![1] as RequestInit | undefined;
+    expect((firstCallInit?.headers as Record<string, string> | undefined)?.Authorization).toBe("Bearer sc_test");
   }, 20000);
 
   it("stops a keyword early when a page returns only already-seen items, even though hasNextPage is true", async () => {
