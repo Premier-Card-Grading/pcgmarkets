@@ -1,4 +1,4 @@
-const DROP_KEY = /^(seller(_?id|_?name|_?username|_?user|_?login|_?info|_?feedback|_?rating|_?email|_?phone)?|username|user_?id|feedback(_?score)?|contact(_?email)?|email|phone)$/i;
+const DROP_KEY = /^(seller.*|username|user_?id|feedback.*|contact.*|email|phone)$/i;
 const KEEP_KEY = /^seller_?country$/i;
 
 export function stripSellerFields(raw: unknown): unknown {

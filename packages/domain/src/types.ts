@@ -1,5 +1,5 @@
 export type Language = "ja" | "en";
-export type Source = "thecardapi" | "yahoo_auc";
+export type Source = "thecardapi" | "yahoo_auc" | "soldcomps";
 export type ListingKind = "sold" | "ended";
 
 /** Structured fields an eBay-derived source can provide. All optional; absent = seller left it blank. */
@@ -43,10 +43,11 @@ export interface CertRecord {
 
 export type TierLabel = "Flawless" | "Pristine" | "Gem Mint";
 export type MatchState = "matched" | "needs_review" | "rejected";
-export type MatchMethod = "ebay_metadata" | "cert" | "jp_set_code" | "jp_number_denom" | "admin";
+export type MatchMethod = "ebay_metadata" | "cert" | "jp_set_code" | "jp_number_denom" | "ebay_title" | "admin";
 export type ReviewReason =
   | "no_card_number" | "no_set_code" | "ambiguous_set" | "no_grade" | "no_metadata"
-  | "grader_missing" | "possible_pcg_set_code" | "possible_pcgs" | "lot" | "grader_not_pcg" | "other";
+  | "grader_missing" | "possible_pcg_set_code" | "possible_pcgs" | "lot" | "grader_not_pcg"
+  | "ambiguous_grader" | "other";
 
 export interface MatchResult {
   state: MatchState;

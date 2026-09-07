@@ -4,6 +4,7 @@ import { catalogTcgdex } from "./jobs/catalog-tcgdex";
 import { fxDaily } from "./jobs/fx-daily";
 import { ebaySold } from "./jobs/ebay-sold";
 import { yahooAuctionsJob } from "./jobs/yahoo-auctions";
+import { soldCompsJob } from "./jobs/soldcomps";
 import { matchJob } from "./jobs/match";
 import { pricesJob } from "./jobs/prices";
 
@@ -13,6 +14,7 @@ const jobs = {
   "fx:daily": fxDaily,
   "ebay:sold": ebaySold,
   "yahoo:auctions": yahooAuctionsJob,
+  "ebay:sold-comps": soldCompsJob,
   match: matchJob({ all: flags.includes("--all") }),
   prices: pricesJob,
 } as const;

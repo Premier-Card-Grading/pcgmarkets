@@ -45,6 +45,15 @@ describe("isLot", () => {
   it.each(["PCG10 ×3", "PCG 10 x 2", "3枚セット", "まとめ売り", "lot of 5", "bundle"])("%s", (t) =>
     expect(isLot(t)).toBe(true));
   it("does not flag bare セット", () => expect(isLot("拡張パック セット PCG10")).toBe(false));
+
+  // Recall bug: the "x"/"×" lot pattern matched the trailing "x" in "ex"/"EX" whenever a card
+  // number followed — flagging a huge fraction of modern Pokemon cards ("... ex NNN/NNN") as
+  // lots. Fixed by requiring a non-letter before the x/×.
+  it("does not flag 'ex' cards as lots", () => {
+    expect(isLot("Sylveon ex 069/187")).toBe(false);
+    expect(isLot("Charizard ex 6/102")).toBe(false);
+  });
+  it("still flags a genuine glued lot marker", () => expect(isLot("PCG10 x3")).toBe(true));
 });
 
 describe("noise", () => {

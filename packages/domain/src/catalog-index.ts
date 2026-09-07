@@ -24,11 +24,17 @@ export interface CatalogIndex {
   setsByCode(code: string, language: Language): SetRef[];
   setsByCardCount(count: number, language: Language): SetRef[];
   setsByNameOrAlias(name: string): SetRef[];
+  /** Conservative whole-name/alias containment scan of free text (case-insensitive). Used only
+   * as a last-resort fallback (e.g. eBay-title matching) — never for matching a card by name. */
+  findSetsInText(text: string): SetRef[];
   productsBySetAndNumber(setId: string, num: number): ProductRef[];
   productsBySuffixAndNumber(suffix: string, num: number, language: Language): ProductRef[];
 }
 
 const norm = (s: string) => s.trim().toLowerCase();
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Short names/aliases (e.g. bare numeric aliases like "151") are too noise-prone for free-text scanning. */
+const MIN_NAME_LEN_FOR_TEXT_SCAN = 4;
 
 export class InMemoryCatalog implements CatalogIndex {
   private byCode = new Map<string, SetRef[]>();
@@ -58,6 +64,15 @@ export class InMemoryCatalog implements CatalogIndex {
   setsByCode(code: string, language: Language) { return this.byCode.get(`${language}:${norm(code)}`) ?? []; }
   setsByCardCount(count: number, language: Language) { return this.byCount.get(`${language}:${count}`) ?? []; }
   setsByNameOrAlias(name: string) { return this.byName.get(norm(name)) ?? []; }
+  findSetsInText(text: string): SetRef[] {
+    const found = new Map<string, SetRef>();
+    for (const [name, refs] of this.byName) {
+      if (name.length < MIN_NAME_LEN_FOR_TEXT_SCAN) continue;
+      const re = new RegExp(`(?<![A-Za-z0-9])${escapeRe(name)}(?![A-Za-z0-9])`, "i");
+      if (re.test(text)) for (const r of refs) found.set(r.id, r);
+    }
+    return [...found.values()];
+  }
   productsBySetAndNumber(setId: string, num: number) { return this.bySetNum.get(`${setId}:${num}`) ?? []; }
   productsBySuffixAndNumber(suffix: string, num: number, language: Language) {
     return this.bySuffixNum.get(`${language}:${norm(suffix)}:${num}`) ?? [];

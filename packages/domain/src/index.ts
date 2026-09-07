@@ -5,5 +5,6 @@ export * from "./jp-extract";
 export * from "./catalog-index";
 export * from "./match-jp";
 export * from "./match-ebay";
+export * from "./match-ebay-title";
 export * from "./matcher";
 export * from "./pricing";
