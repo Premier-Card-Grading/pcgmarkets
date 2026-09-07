@@ -1,0 +1,40 @@
+{
+  "id": "sv04.5",
+  "name": "Paldean Fates",
+  "releaseDate": "2024-01-26",
+  "cardCount": {
+    "firstEd": 0,
+    "holo": 183,
+    "normal": 65,
+    "official": 91,
+    "reverse": 85,
+    "total": 245
+  },
+  "serie": {
+    "id": "sv",
+    "name": "Scarlet & Violet"
+  },
+  "abbreviation": {
+    "official": "PAF"
+  },
+  "cards": [
+    {
+      "id": "sv04.5-001",
+      "image": "https://assets.tcgdex.net/en/sv/sv04.5/001",
+      "localId": "001",
+      "name": "Pineco"
+    },
+    {
+      "id": "sv04.5-002",
+      "image": "https://assets.tcgdex.net/en/sv/sv04.5/002",
+      "localId": "002",
+      "name": "Forretress ex"
+    },
+    {
+      "id": "sv04.5-003",
+      "image": "https://assets.tcgdex.net/en/sv/sv04.5/003",
+      "localId": "003",
+      "name": "Maractus"
+    }
+  ]
+}

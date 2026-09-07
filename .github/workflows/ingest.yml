@@ -1,0 +1,64 @@
+name: ingest
+on:
+  schedule:
+    - cron: "5 */6 * * *"     # sold sources, every 6h
+    - cron: "35 3 * * *"      # fx daily
+    - cron: "50 3 * * 1"      # catalog weekly (Mon)
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "job name (catalog:tcgdex | ebay:sold | yahoo:auctions | fx:daily | match | prices)"
+        required: true
+
+concurrency:
+  group: ingest-${{ github.event.inputs.job || github.event.schedule }}
+  cancel-in-progress: false
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+  THECARDAPI_KEY: ${{ secrets.THECARDAPI_KEY }}
+  CONTACT_EMAIL: ${{ secrets.CONTACT_EMAIL }}
+  CONNECTOR_THECARDAPI: ${{ vars.CONNECTOR_THECARDAPI || 'on' }}
+  CONNECTOR_YAHOO_AUC: ${{ vars.CONNECTOR_YAHOO_AUC || 'on' }}
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      jobs: ${{ steps.pick.outputs.jobs }}
+    steps:
+      - id: pick
+        run: |
+          if [ -n "${{ github.event.inputs.job }}" ]; then echo 'jobs=["${{ github.event.inputs.job }}"]' >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "35 3 * * *" ]; then echo 'jobs=["fx:daily"]' >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.schedule }}" = "50 3 * * 1" ]; then echo 'jobs=["catalog:tcgdex"]' >> "$GITHUB_OUTPUT"
+          else echo 'jobs=["yahoo:auctions","ebay:sold"]' >> "$GITHUB_OUTPUT"; fi
+
+  run:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        job: ${{ fromJson(needs.setup.outputs.jobs) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ingest ${{ matrix.job }}
+
+  derive:
+    needs: run
+    if: always() && needs.run.result != 'skipped' && !contains(fromJson(needs.setup.outputs.jobs), 'match')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm ingest match
+      - run: pnpm ingest prices

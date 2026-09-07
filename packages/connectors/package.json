@@ -1,0 +1,9 @@
+{
+  "name": "@pcg/connectors",
+  "version": "0.0.1",
+  "type": "module",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": { "test": "vitest run", "typecheck": "tsc --noEmit" },
+  "dependencies": { "cheerio": "^1.0.0", "@pcg/domain": "workspace:*", "@pcg/db": "workspace:*" }
+}
