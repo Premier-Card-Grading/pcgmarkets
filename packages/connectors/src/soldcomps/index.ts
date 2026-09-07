@@ -41,8 +41,9 @@ export function toRawListing(item: unknown): RawListing | null {
     imageUrls: [],
     // Title-only source: no structured grader/grade/set/cardNumber/language fields.
     metadata: {},
-    // Full vendor payload, PII (sellerUsername/sellerPositivePercent) included — stripped at the
-    // DB insert layer (stripSellerFields), not here.
+    // Full vendor payload, including seller PII (username, feedback score, positive %) — all
+    // seller* fields except sellerCountry are stripped at the DB insert layer (stripSellerFields),
+    // not here.
     raw: item,
   };
 }
