@@ -25,7 +25,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
     .order("updated_at", { ascending: false })
     .limit(50);
   if (reason && reason !== "other") qy = qy.eq("review_reason", reason);
-  else if (reason === "other") qy = qy.not("review_reason", "in", `(${KNOWN_REASONS.join(",")})`);
+  else if (reason === "other") qy = qy.or(`review_reason.is.null,review_reason.not.in.(${KNOWN_REASONS.join(",")})`);
   const { data: rows } = await qy;
 
   const { data: fx } = await db.from("fx_rates").select("base,rate").eq("quote", "USD").order("date", { ascending: false }).limit(20);
