@@ -7,17 +7,20 @@ function db(rpcResult: unknown[], products: unknown[], points: unknown[] = []) {
     from: vi.fn((t: string) => ({
       select: () => ({
         in: async () => ({ data: t === "products" ? products : points, error: null }),
-        eq: () => ({ eq: () => ({ eq: () => ({ in: async () => ({ data: points, error: null }) }) }) }),
+        eq: () => ({ eq: () => ({ in: () => ({ in: async () => ({ data: points, error: null }) }) }) }),
       }),
     })),
   } as never;
 }
 
 describe("searchProducts", () => {
-  it("number-shaped input calls search_products_by_number and hydrates", async () => {
-    const d = db([{ id: "SV1a-073", sale_count: 4 }], [{ id: "SV1a-073", name_en: null, name_ja: "デカヌチャン", number_printed: "073/073", language: "ja", image_url: null, sets: { name_en: null, name_ja: "トリプレットビート" } }], [{ product_id: "SV1a-073", median_usd: 42 }]);
-    const r = await searchProducts(d, "080/090".replace("080/090", "073/073"));
-    expect(r).toEqual({ results: [{ id: "SV1a-073", nameEn: null, nameJa: "デカヌチャン", setName: "トリプレットビート", numberPrinted: "073/073", language: "ja", imageUrl: null, pcg10Median: 42, saleCount: 4 }] });
+  it("number-shaped input calls search_products_by_number and hydrates per-grade medians", async () => {
+    const d = db([{ id: "SV1a-073", sale_count: 4 }],
+      [{ id: "SV1a-073", name_en: null, name_ja: "デカヌチャン", number_printed: "073/073", language: "ja", image_url: null, sets: { name_en: null, name_ja: "トリプレットビート", printed_code: "SV1a" } }],
+      [{ product_id: "SV1a-073", grade_value: 10, median_usd: 42, n_sales: 3 }, { product_id: "SV1a-073", grade_value: 9, median_usd: 12, n_sales: 1 }]);
+    const r = await searchProducts(d, "073/073");
+    expect(r).toEqual({ results: [{ id: "SV1a-073", nameEn: null, nameJa: "デカヌチャン", setName: "トリプレットビート", setCode: "SV1a", numberPrinted: "073/073", language: "ja", imageUrl: null,
+      grades: { g10: { medianUsd: 42, nSales: 3 }, g95: null, g9: { medianUsd: 12, nSales: 1 } }, saleCount: 4 }] });
     expect((d as { rpc: ReturnType<typeof vi.fn> }).rpc).toHaveBeenCalledWith("search_products_by_number", { p_num: 73, p_denom: 73, p_suffix: null, lim: 30 });
   });
   it("name input calls search_products_by_name", async () => {
