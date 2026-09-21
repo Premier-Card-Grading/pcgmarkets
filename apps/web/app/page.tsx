@@ -1,10 +1,6 @@
-import { SearchBox } from "@/components/SearchBox";
+import { AppHeader } from "@/components/AppHeader";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SearchField } from "@/components/SearchField";
 export default function Home() {
-  return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-semibold">What did PCG slabs actually sell for?</h1>
-        <p className="text-zinc-600">Search by card number first — that&apos;s the fastest way to the right printing.</p></div>
-      <SearchBox />
-    </div>
-  );
+  return (<><AppHeader variant="public" search={{ show: false }} /><main className="mx-auto w-full max-w-[1120px] flex-1 px-5 pt-6 pb-10"><SearchField variant="hero" autoFocus className="max-w-[680px]" /></main><SiteFooter /></>);
 }
