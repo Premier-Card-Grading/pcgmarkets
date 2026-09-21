@@ -1,38 +1,35 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { AppHeader } from "@/components/AppHeader";
+import { SiteFooter } from "@/components/SiteFooter";
+import { Chip } from "@/components/Chip";
 import { anonClient } from "@/lib/supabase-server";
-import { loadCard, gridColumns } from "@/lib/card-data";
-import { PriceGrid } from "@/components/PriceGrid";
-import { SoldList } from "@/components/SoldList";
-import { PriceChart } from "@/components/PriceChart";
+import { loadCard } from "@/lib/card-data";
 
-export const revalidate = 900;
-const WINDOWS = ["30d", "90d", "180d", "all"];
-
-export default async function CardPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ w?: string; cert?: string }> }) {
-  const { id } = await params; const { w, cert } = await searchParams;
-  const window = WINDOWS.includes(w ?? "") ? w! : "90d";
+// Temporary stub for the card page (masthead only) — replaced by the full card
+// view in Task 11. Keeps the app building after Task 8 removes gridColumns.
+export default async function CardPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const data = await loadCard(anonClient(), decodeURIComponent(id));
   if (!data) notFound();
-  const { product, set, points, sales } = data;
-  return (
-    <div className="space-y-6">
-      <div className="flex gap-4">
-        {product.image_url && <img src={product.image_url} alt="" className="h-48 w-auto rounded-lg shadow" />}
-        <div>
-          <h1 className="text-2xl font-semibold">{product.name_en ?? product.name_ja}</h1>
-          {product.name_en && product.name_ja && <div className="text-zinc-600">{product.name_ja}</div>}
-          <div className="mt-1 text-zinc-600">{set.name_en ?? set.name_ja} {set.printed_code && <span className="text-zinc-400">({set.printed_code})</span>} · {product.number_printed} · <span className="rounded bg-zinc-100 px-1 text-xs uppercase">{product.language}</span></div>
-          {cert && <div className="mt-2 text-sm text-green-700">Cert {cert} resolved to this card.</div>}
-        </div>
+  const { product, set } = data;
+  const name = product.language === "ja" ? product.name_ja ?? product.name_en : product.name_en ?? product.name_ja;
+  const setName = set.name_en ?? set.name_ja ?? "";
+  return (<>
+    <AppHeader variant="public" />
+    <main className="mx-auto w-full max-w-[1120px] flex-1 px-5 pt-6 pb-10">
+      <div className="mb-2 flex items-center gap-1.5 text-[13px] text-mute">
+        {setName && <Link href={`/search?q=${encodeURIComponent(set.printed_code ?? setName)}`} className="font-semibold text-teal no-underline">{setName}</Link>}
+        <span>·</span>
+        <span className="uppercase">{product.language}</span>
       </div>
-      <section className="space-y-2">
-        <div className="flex items-center justify-between"><h2 className="font-semibold">PCG price</h2>
-          <div className="flex gap-1 text-sm">{WINDOWS.map((x) => <Link key={x} href={`?w=${x}`} className={`rounded px-2 py-1 ${x === window ? "bg-zinc-900 text-white" : "bg-white border"}`}>{x}</Link>)}</div></div>
-        <PriceGrid columns={gridColumns(points, window)} window={window} />
-      </section>
-      <section className="space-y-2"><h2 className="font-semibold">Sold</h2><SoldList sales={sales} /></section>
-      <section className="space-y-2"><h2 className="font-semibold">Over time</h2><PriceChart sales={sales} /></section>
-    </div>
-  );
+      <h1 className="m-0 mb-3 text-[28px] font-extrabold tracking-[-0.025em]">{name}</h1>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <Chip variant="number">{product.number_printed}</Chip>
+        {set.printed_code && <Chip>{set.printed_code}</Chip>}
+        <Chip variant="lang">{product.language}</Chip>
+      </div>
+    </main>
+    <SiteFooter />
+  </>);
 }

@@ -1,5 +1,9 @@
-import type { GridColumn } from "@/lib/card-data";
+import type { PricePointRow } from "@/lib/card-data";
 import { fmtUsd } from "@/lib/format";
+// Local type: GridColumn was removed from lib/card-data.ts in Task 8. This
+// component is orphaned (no longer rendered by app/card/[id]/page.tsx) and
+// will be deleted in Task 11; this keeps it typechecking in the meantime.
+interface GridColumn { title: string; point: PricePointRow }
 const dot = { high: "bg-green-500", med: "bg-amber-500", low: "bg-zinc-400" } as const;
 export function PriceGrid({ columns, window }: { columns: GridColumn[]; window: string }) {
   if (columns.length === 0) return <div className="rounded-lg border bg-white p-6 text-zinc-500">No PCG sales recorded in this window yet.</div>;
