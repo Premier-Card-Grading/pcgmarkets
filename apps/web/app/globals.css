@@ -1,26 +1,65 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ground:#F4F6F8; --surface:#FFFFFF; --sunk:#E9EDF1; --ink:#16212D; --ink-2:#3C4855; --muted:#56616E; --line:#D3D9E0; --line-2:#E4E8EC;
+  --accent:#0B5D75; --accent-ink:#FFFFFF; --accent-soft:#DDEFF3;
+  --gold:#8F6400; --gold-badge:#F2C24E; --gold-fill:#FBF1D2; --gold-line:#E2BE5A; --gold-deep:#5E4100;
+  --good:#1E7F4F; --good-fill:#E3F4EA; --warn:#A65E00; --warn-fill:#FBEFD9; --bad:#B42318; --bad-fill:#FBE4E1;
+  --bar:#16212D; --bar-ink:#F4F6F8; --bar-mute:#98A5B3; --bar-line:#2A3644; --bar-field:#243040;
+  --focus:#0B5D75; --shadow:0 10px 30px -12px rgba(22,33,45,.35);
+  --badge-ink:#16212D;
 }
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --ground:#0E1318; --surface:#161C23; --sunk:#1B222A; --ink:#EAEEF2; --ink-2:#C6CED6; --muted:#9AA5B1; --line:#334050; --line-2:#222B34;
+    --accent:#63C3DA; --accent-ink:#0B1B21; --accent-soft:#12303A;
+    --gold:#E4B84B; --gold-badge:#E9B93E; --gold-fill:#2A2410; --gold-line:#7A6224; --gold-deep:#F3D68A;
+    --good:#5BC98C; --good-fill:#12301F; --warn:#F0B35B; --warn-fill:#33250D; --bad:#F08A80; --bad-fill:#3A1512;
+    --bar:#0A0E13; --bar-ink:#EAEEF2; --bar-mute:#8E9AA7; --bar-line:#1F2830; --bar-field:#161D26;
+    --focus:#63C3DA; --shadow:0 10px 30px -12px rgba(0,0,0,.7);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@theme inline {
+  --font-sans: var(--font-archivo), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Segoe UI", system-ui, sans-serif;
+
+  /* project tokens */
+  --color-ground: var(--ground); --color-surface: var(--surface); --color-sunk: var(--sunk);
+  --color-ink: var(--ink); --color-ink-2: var(--ink-2); --color-mute: var(--muted);
+  --color-line: var(--line); --color-line-2: var(--line-2);
+  --color-teal: var(--accent); --color-teal-ink: var(--accent-ink); --color-teal-soft: var(--accent-soft);
+  --color-gold: var(--gold); --color-gold-badge: var(--gold-badge); --color-gold-fill: var(--gold-fill); --color-gold-line: var(--gold-line); --color-gold-deep: var(--gold-deep);
+  --color-good: var(--good); --color-good-fill: var(--good-fill); --color-warn: var(--warn); --color-warn-fill: var(--warn-fill); --color-bad: var(--bad); --color-bad-fill: var(--bad-fill);
+  --color-bar: var(--bar); --color-bar-ink: var(--bar-ink); --color-bar-mute: var(--bar-mute); --color-bar-line: var(--bar-line); --color-bar-field: var(--bar-field);
+  --color-badge-ink: var(--badge-ink);
+  --shadow-object: var(--shadow);
+
+  /* shadcn aliases so generated components pick up our tokens */
+  --color-background: var(--ground); --color-foreground: var(--ink);
+  --color-card: var(--surface); --color-card-foreground: var(--ink);
+  --color-popover: var(--surface); --color-popover-foreground: var(--ink);
+  --color-primary: var(--ink); --color-primary-foreground: var(--ground);
+  --color-secondary: var(--sunk); --color-secondary-foreground: var(--ink);
+  --color-muted: var(--sunk); --color-muted-foreground: var(--muted);
+  --color-accent: var(--sunk); --color-accent-foreground: var(--ink);
+  --color-destructive: var(--bad); --color-border: var(--line-2); --color-input: var(--line); --color-ring: var(--focus);
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+html { font-variation-settings: "wdth" 100; -webkit-font-smoothing: antialiased; }
+body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 1.5; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.wdth-112 { font-variation-settings: "wdth" 112; }
+.wdth-100 { font-variation-settings: "wdth" 100; }
+.wdth-104 { font-variation-settings: "wdth" 104; }
+.wdth-105 { font-variation-settings: "wdth" 105; }
+.wdth-96 { font-variation-settings: "wdth" 96; }
+.wdth-92 { font-variation-settings: "wdth" 92; }
+.wdth-82 { font-variation-settings: "wdth" 82; }
+.tnum { font-variant-numeric: tabular-nums; }
+.no-scrollbar::-webkit-scrollbar { height: 0; width: 0; }
+.no-scrollbar { scrollbar-width: none; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }
