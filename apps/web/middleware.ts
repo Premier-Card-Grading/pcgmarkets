@@ -6,6 +6,7 @@ export async function middleware(req: NextRequest) {
     cookies: { getAll: () => req.cookies.getAll(), setAll: (all: { name: string; value: string; options: CookieOptions }[]) => { for (const c of all) res.cookies.set(c.name, c.value, c.options); } },
   });
   await sb.auth.getUser();
+  res.headers.set("x-pathname", req.nextUrl.pathname);
   return res;
 }
 export const config = { matcher: ["/admin/:path*"] };
