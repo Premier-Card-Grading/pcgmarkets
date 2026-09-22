@@ -48,24 +48,34 @@ export function toRawListing(item: unknown): RawListing | null {
   };
 }
 
-export interface SoldCompsCursor { keywordIndex: number; page: number; seenIds: string[] }
+export interface SoldCompsCursor { siteIndex: number; page: number; seenIds: string[] }
+
+/** Builds the /scrape request URL for one eBay site + page, with the PCG grading-company facet. */
+export function buildScrapeUrl(site: string, page: number): URL {
+  const u = new URL(SOLDCOMPS.baseUrl + SOLDCOMPS.scrapePath);
+  u.searchParams.set("keyword", SOLDCOMPS.keyword);
+  u.searchParams.set("ebaySite", site);
+  u.searchParams.set("categoryId", SOLDCOMPS.categoryId);
+  u.searchParams.set("aspectFilter", JSON.stringify(SOLDCOMPS.aspectFilter));
+  u.searchParams.set("sortOrder", SOLDCOMPS.sortOrder);
+  u.searchParams.set("page", String(page));
+  u.searchParams.set("count", String(SOLDCOMPS.count));
+  return u;
+}
 
 export const soldComps: Connector = {
   name: "soldcomps",
   async *fetchSold(cursorIn: unknown | null): AsyncGenerator<Page> {
     const key = process.env.SOLDCOMPS_KEY;
     if (!key) throw new Error("SOLDCOMPS_KEY is required");
-    const cursor: SoldCompsCursor = (cursorIn as SoldCompsCursor | null) ?? { keywordIndex: 0, page: 1, seenIds: [] };
+    const cursor: SoldCompsCursor = (cursorIn as SoldCompsCursor | null) ?? { siteIndex: 0, page: 1, seenIds: [] };
     const seen = new Set(cursor.seenIds);
-    let { keywordIndex, page } = cursor;
+    let { siteIndex, page } = cursor;
 
-    while (keywordIndex < SOLDCOMPS.keywords.length) {
-      const keyword = SOLDCOMPS.keywords[keywordIndex]!;
-      const u = new URL(SOLDCOMPS.baseUrl + SOLDCOMPS.scrapePath);
-      u.searchParams.set("keyword", keyword);
-      u.searchParams.set("page", String(page));
-      u.searchParams.set("count", String(SOLDCOMPS.count));
-      const res = await politeFetch(u.toString(), { minIntervalMs: 1000, headers: SOLDCOMPS.authHeader(key) });
+    while (siteIndex < SOLDCOMPS.ebaySites.length) {
+      const site = SOLDCOMPS.ebaySites[siteIndex]!;
+      const url = buildScrapeUrl(site, page).toString();
+      const res = await politeFetch(url, { minIntervalMs: 1000, headers: SOLDCOMPS.authHeader(key) });
       if (!res.ok) throw new Error(`soldcomps ${res.status}`);
       const body = await res.json();
       const items = extractItems(body);
@@ -83,8 +93,8 @@ export const soldComps: Connector = {
       const exhausted = !hasNextPage || pageFullyKnown || capReached;
 
       const next: SoldCompsCursor = exhausted
-        ? { keywordIndex: keywordIndex + 1, page: 1, seenIds: [...seen].slice(-5000) }
-        : { keywordIndex, page: page + 1, seenIds: [...seen].slice(-5000) };
+        ? { siteIndex: siteIndex + 1, page: 1, seenIds: [...seen].slice(-5000) }
+        : { siteIndex, page: page + 1, seenIds: [...seen].slice(-5000) };
 
       yield {
         listings: fresh.map(toRawListing).filter((l): l is RawListing => l !== null),
@@ -92,10 +102,10 @@ export const soldComps: Connector = {
         suspect: items.length === 0 && page === 1,
       };
 
-      keywordIndex = next.keywordIndex;
+      siteIndex = next.siteIndex;
       page = next.page;
     }
-    // Completed a full sweep of all keywords: reset for the next run but keep the seen set.
-    yield { listings: [], nextCursor: { keywordIndex: 0, page: 1, seenIds: [...seen].slice(-5000) } };
+    // Completed a full sweep of all eBay sites: reset for the next run but keep the seen set.
+    yield { listings: [], nextCursor: { siteIndex: 0, page: 1, seenIds: [...seen].slice(-5000) } };
   },
 };
