@@ -67,7 +67,7 @@ describe("soldComps.fetchSold (synthetic: mocked fetch)", () => {
     delete process.env.SOLDCOMPS_KEY;
   });
 
-  it("bounds requests to keywords.length * PAGE_CAP even when hasNextPage never goes false", async () => {
+  it("bounds requests to ebaySites.length * PAGE_CAP even when hasNextPage never goes false", async () => {
     process.env.SOLDCOMPS_KEY = "sc_test";
     _resetForTests();
     let calls = 0;
@@ -78,21 +78,21 @@ describe("soldComps.fetchSold (synthetic: mocked fetch)", () => {
 
     for await (const _page of soldComps.fetchSold(null)) { /* drain the sweep */ }
 
-    expect(calls).toBe(SOLDCOMPS.keywords.length * PAGE_CAP);
+    expect(calls).toBe(SOLDCOMPS.ebaySites.length * PAGE_CAP);
   }, 20000);
 
-  it("persists-then-advances the cursor page-by-page within a keyword, then to the next keyword, with no duplicate ids across pages", async () => {
+  it("persists-then-advances the cursor page-by-page within a site, then to the next site, with no duplicate ids across pages", async () => {
     process.env.SOLDCOMPS_KEY = "sc_test";
     _resetForTests();
     vi.stubGlobal("fetch", vi.fn(async (url: string | URL) => {
       const u = new URL(url);
-      const kw = u.searchParams.get("keyword");
+      const site = u.searchParams.get("ebaySite");
       const page = Number(u.searchParams.get("page"));
-      if (kw === SOLDCOMPS.keywords[0]) {
-        // Keyword 0 has exactly 2 pages of fresh items, then stops.
-        return mockJsonResponse({ items: [fakeItem(`k0-p${page}`)], hasNextPage: page < 2 });
+      if (site === SOLDCOMPS.ebaySites[0]) {
+        // Site 0 has exactly 2 pages of fresh items, then stops.
+        return mockJsonResponse({ items: [fakeItem(`s0-p${page}`)], hasNextPage: page < 2 });
       }
-      // All other keywords are exhausted on their first page.
+      // All other sites are exhausted on their first page.
       return mockJsonResponse({ items: [], hasNextPage: false });
     }));
 
@@ -108,44 +108,50 @@ describe("soldComps.fetchSold (synthetic: mocked fetch)", () => {
     }
 
     expect(duplicate).toBe(false);
-    // page 1 of keyword 0 -> cursor advances to page 2, same keyword (persist-then-advance).
-    expect(cursors[0]).toMatchObject({ keywordIndex: 0, page: 2 });
-    // page 2 of keyword 0 has hasNextPage=false -> cursor moves to keyword 1, page 1.
-    expect(cursors[1]).toMatchObject({ keywordIndex: 1, page: 1 });
-    // remaining keywords each exhaust after one page.
-    expect(cursors[2]).toMatchObject({ keywordIndex: 2, page: 1 });
-    expect(cursors[3]).toMatchObject({ keywordIndex: 3, page: 1 });
+    // page 1 of site 0 -> cursor advances to page 2, same site (persist-then-advance).
+    expect(cursors[0]).toMatchObject({ siteIndex: 0, page: 2 });
+    // page 2 of site 0 has hasNextPage=false -> cursor moves to site 1, page 1.
+    expect(cursors[1]).toMatchObject({ siteIndex: 1, page: 1 });
+    // remaining sites each exhaust after one page (siteIndex advances past the last).
+    expect(cursors[2]).toMatchObject({ siteIndex: 2, page: 1 });
     // full sweep complete: cursor resets to the start for the next run.
-    expect(cursors[cursors.length - 1]).toMatchObject({ keywordIndex: 0, page: 1 });
+    expect(cursors[cursors.length - 1]).toMatchObject({ siteIndex: 0, page: 1 });
   }, 20000);
 
-  it("stops a keyword after one page when hasNextPage is false", async () => {
+  it("stops a site after one page when hasNextPage is false", async () => {
     process.env.SOLDCOMPS_KEY = "sc_test";
     _resetForTests();
-    const callsPerKeyword: Record<string, number> = {};
+    const callsPerSite: Record<string, number> = {};
     const fetchMock = vi.fn(async (url: string | URL, init?: RequestInit) => {
-      const kw = new URL(url).searchParams.get("keyword")!;
-      callsPerKeyword[kw] = (callsPerKeyword[kw] ?? 0) + 1;
-      return mockJsonResponse({ items: [fakeItem(`${kw}-1`)], hasNextPage: false });
+      const site = new URL(url).searchParams.get("ebaySite")!;
+      callsPerSite[site] = (callsPerSite[site] ?? 0) + 1;
+      return mockJsonResponse({ items: [fakeItem(`${site}-1`)], hasNextPage: false });
     });
     vi.stubGlobal("fetch", fetchMock);
 
     for await (const _page of soldComps.fetchSold(null)) { /* drain */ }
 
-    for (const kw of SOLDCOMPS.keywords) expect(callsPerKeyword[kw]).toBe(1);
+    for (const site of SOLDCOMPS.ebaySites) expect(callsPerSite[site]).toBe(1);
 
     // Regression guard: the request URL must hit the real SoldComps endpoint
     // (https://api.sold-comps.com/v1/scrape?...). A prior bug built the URL as
     // `new URL(scrapePath, baseUrl)`, which — because scrapePath is an absolute
     // path — silently discarded baseUrl's own "/v1" path segment and requested
     // https://api.sold-comps.com/scrape instead, 404ing on every live call.
-    const firstCallUrl = String(fetchMock.mock.calls[0]![0]);
-    expect(firstCallUrl).toMatch(/^https:\/\/api\.sold-comps\.com\/v1\/scrape\?/);
+    const firstCallUrl = new URL(String(fetchMock.mock.calls[0]![0]));
+    expect(`${firstCallUrl.origin}${firstCallUrl.pathname}`).toBe("https://api.sold-comps.com/v1/scrape");
+    // Accuracy guard: the request filters by eBay's PCG grading-company facet and the
+    // Pokémon singles category, instead of text-searching "PCG" in titles.
+    expect(JSON.parse(firstCallUrl.searchParams.get("aspectFilter")!)).toEqual({
+      "Professional Grader": "Premier Card Grading (PCG)",
+    });
+    expect(firstCallUrl.searchParams.get("categoryId")).toBe("183454");
+    expect(SOLDCOMPS.ebaySites).toContain(firstCallUrl.searchParams.get("ebaySite"));
     const firstCallInit = fetchMock.mock.calls[0]![1] as RequestInit | undefined;
     expect((firstCallInit?.headers as Record<string, string> | undefined)?.Authorization).toBe("Bearer sc_test");
   }, 20000);
 
-  it("stops a keyword early when a page returns only already-seen items, even though hasNextPage is true", async () => {
+  it("stops a site early when a page returns only already-seen items, even though hasNextPage is true", async () => {
     process.env.SOLDCOMPS_KEY = "sc_test";
     _resetForTests();
     const seenId = "dup-1";
@@ -155,13 +161,13 @@ describe("soldComps.fetchSold (synthetic: mocked fetch)", () => {
       return mockJsonResponse({ items: [fakeItem(seenId)], hasNextPage: true });
     }));
 
-    const cursor: SoldCompsCursor = { keywordIndex: 0, page: 1, seenIds: [seenId] };
+    const cursor: SoldCompsCursor = { siteIndex: 0, page: 1, seenIds: [seenId] };
     const pages = [];
     for await (const page of soldComps.fetchSold(cursor)) pages.push(page);
 
-    // Every keyword's very first page returns nothing but the already-seen id, so each
-    // keyword stops after exactly one fetch despite hasNextPage:true.
-    expect(calls).toBe(SOLDCOMPS.keywords.length);
+    // Every site's very first page returns nothing but the already-seen id, so each
+    // site stops after exactly one fetch despite hasNextPage:true.
+    expect(calls).toBe(SOLDCOMPS.ebaySites.length);
     expect(pages.every((p) => p.listings.length === 0)).toBe(true);
   }, 20000);
 
