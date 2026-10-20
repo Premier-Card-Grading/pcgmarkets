@@ -1,11 +1,11 @@
-import type { PricePointRow, SaleRow } from "./card-data";
+import type { EstimateRow, PricePointRow, SaleRow } from "./card-data";
 export type Window = "30d" | "90d" | "180d" | "all";
 export const WINDOWS: { value: Window; label: string; days: number | null; text: string }[] = [
   { value: "30d", label: "30d", days: 30, text: "30 days" }, { value: "90d", label: "90d", days: 90, text: "90 days" }, { value: "180d", label: "180d", days: 180, text: "180 days" }, { value: "all", label: "All", days: null, text: "all time" },
 ];
 export const isWindow = (w: unknown): w is Window => WINDOWS.some((x) => x.value === w);
 export type GradeKey = string;
-export interface GradeOption { key: GradeKey; gradeValue: number; tier: string | null; label: string; nSales: number; medianUsd: number; minUsd: number; maxUsd: number; confidence: "high" | "med" | "low"; lastSoldAt: string }
+export interface GradeOption { key: GradeKey; gradeValue: number; tier: string | null; label: string; nSales: number; medianUsd: number; minUsd: number; maxUsd: number; confidence: "high" | "med" | "low"; lastSoldAt: string; estimate?: boolean }
 const TIER_KEYS: Record<string, string> = { Flawless: "fl", Pristine: "pr", "Gem Mint": "gm" };
 const TIER_ORDER = ["Flawless", "Pristine", "Gem Mint"];
 export const gradeKey = (g: number, tier: string | null) => `${String(g).replace(".", "")}${tier ? TIER_KEYS[tier] ?? "" : ""}`;
@@ -22,9 +22,24 @@ export function gradeOptions(points: PricePointRow[], window: Window): GradeOpti
   for (const p of inWin.filter((p) => Number(p.grade_value) < 10 && p.grade_label === "any").sort((a, b) => Number(b.grade_value) - Number(a.grade_value))) out.push(mk(p, null));
   return out;
 }
+export const ESTIMATE_MAX_AGE_DAYS = 14;
+/** Estimated grades: only where the card has never had a PCG sale at that grade (any window), and the source is fresh. */
+export function estimateOptions(points: PricePointRow[], estimates: EstimateRow[], now: Date): GradeOption[] {
+  const real = new Set(points.filter((p) => p.n_sales > 0).map((p) => Number(p.grade_value)));
+  const maxAge = ESTIMATE_MAX_AGE_DAYS * 86400000;
+  return estimates
+    .filter((e) => !real.has(Number(e.grade_value)) && now.getTime() - new Date(e.source_as_of).getTime() <= maxAge)
+    .sort((a, b) => Number(b.grade_value) - Number(a.grade_value))
+    .map((e) => {
+      const g = Number(e.grade_value), v = Number(e.estimate_usd);
+      return { key: `${gradeKey(g, null)}e`, gradeValue: g, tier: null, label: gradeLabel(g, null), nSales: 0, medianUsd: v, minUsd: v, maxUsd: v, confidence: "low" as const, lastSoldAt: "", estimate: true };
+    });
+}
 export function defaultGradeKey(options: GradeOption[]): GradeKey | null {
   if (options.length === 0) return null;
-  return options.find((o) => o.key === "10gm")?.key ?? options.find((o) => o.key === "10")?.key ?? [...options].sort((a, b) => b.nSales - a.nSales)[0]!.key;
+  const real = options.filter((o) => !o.estimate);
+  if (real.length === 0) return options[0]!.key;
+  return real.find((o) => o.key === "10gm")?.key ?? real.find((o) => o.key === "10")?.key ?? [...real].sort((a, b) => b.nSales - a.nSales)[0]!.key;
 }
 const inRange = (s: SaleRow, from: number, to: number) => { if (!s.sold_at) return false; const t = new Date(s.sold_at).getTime(); return t > from && t <= to; };
 const matches = (s: SaleRow, o: GradeOption) => Number(s.grade_value) === o.gradeValue && (o.tier == null || s.grade_label === o.tier);

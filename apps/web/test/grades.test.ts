@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { gradeOptions, defaultGradeKey, salesFor, deltaPct, rollingMedian, niceStep, gradeKey, gradeLabel } from "../lib/grades";
-import type { PricePointRow, SaleRow } from "../lib/card-data";
+import { gradeOptions, defaultGradeKey, salesFor, deltaPct, rollingMedian, niceStep, gradeKey, gradeLabel, estimateOptions, ESTIMATE_MAX_AGE_DAYS } from "../lib/grades";
+import type { EstimateRow, PricePointRow, SaleRow } from "../lib/card-data";
 const pt = (grade_value: number, grade_label: string, n_sales: number, window = "90d"): PricePointRow => ({ product_id: "x", grade_value, grade_label, window, n_sales, median_usd: 100, min_usd: 90, max_usd: 110, last_sold_at: "2026-09-01", confidence: "med" });
 const now = new Date("2026-09-21T00:00:00Z");
 const sale = (daysAgo: number, usd: number, grade: number, label: string | null = null, bo = false): SaleRow => ({ id: `${daysAgo}-${usd}`, grade_value: grade, grade_label: label, price: usd, currency: "USD", price_usd: usd, sold_at: new Date(now.getTime() - daysAgo * 86400000).toISOString(), source: "soldcomps", url: "#", is_best_offer: bo });
@@ -42,4 +42,25 @@ describe("sales filtering and delta", () => {
     expect(r[0]!.t).toBeLessThan(r[1]!.t);
   });
   it("nice steps", () => { expect(niceStep(418)).toBe(200); expect(niceStep(1240)).toBe(500); expect(niceStep(74)).toBe(25); });
+});
+
+describe("estimate options", () => {
+  const est = (grade_value: number, estimate_usd: number, daysOld = 1): EstimateRow => ({ grade_value, estimate_usd, source_as_of: new Date(now.getTime() - daysOld * 86400000).toISOString() });
+  it("builds options only for grades with no real price in any window, highest first, keyed with an 'e' suffix", () => {
+    const opts = estimateOptions([pt(9, "any", 2, "all")], [est(9, 50), est(10, 84), est(8, 30)], now);
+    expect(opts.map((o) => o.key)).toEqual(["10e", "8e"]);
+    expect(opts[0]).toMatchObject({ gradeValue: 10, label: "PCG 10", medianUsd: 84, estimate: true, nSales: 0 });
+  });
+  it("treats a grade that sold only outside the current window as real, so it gets no estimate", () => {
+    expect(estimateOptions([pt(9.5, "any", 1, "all"), pt(9.5, "any", 0, "90d")], [est(9.5, 40)], now)).toEqual([]);
+  });
+  it("drops estimates older than ESTIMATE_MAX_AGE_DAYS", () => {
+    expect(estimateOptions([], [est(10, 84, ESTIMATE_MAX_AGE_DAYS + 1)], now)).toEqual([]);
+  });
+  it("default grade prefers a real grade over an estimated 10, and falls back to the first estimate", () => {
+    const real = gradeOptions([pt(9, "any", 3)], "90d");
+    const mixed = [...real, ...estimateOptions([pt(9, "any", 3, "all")], [est(10, 84)], now)];
+    expect(defaultGradeKey(mixed)).toBe("9");
+    expect(defaultGradeKey(estimateOptions([], [est(10, 84), est(9, 40)], now))).toBe("10e");
+  });
 });
