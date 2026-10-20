@@ -13,6 +13,8 @@ export const LIMITLESS_TO_OURS: Record<string, string> = {
   "BW6f": "BW6a",
   "BW8f": "BW8a",
   "BW8n": "BW8b",
+  "MP": "M-P",
+  "SVP": "SV-P",
   "XY11b": "XY11a",
   "XY11r": "XY11b",
   "XY1x": "XY1a",
