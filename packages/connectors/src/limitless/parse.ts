@@ -20,6 +20,11 @@ export function parseLimitlessDate(s: string): string | null {
 }
 
 export const imageUrl = (xs: string, size: "SM" | "LG") => xs.replace(/_XS\.png$/, `_${size}.png`);
+export function bareJaSetName(s: string | null): string | null {
+  if (s == null) return null;
+  const m = /「([^」]*)」/.exec(s);
+  return m ? m[1]! : s.trim();
+}
 export const logoUrl = (code: string) => `https://s3.limitlesstcg.com/sets/jp/${code}.png`;
 
 export function parseSetIndex(html: string): LimitlessSetSummary[] {

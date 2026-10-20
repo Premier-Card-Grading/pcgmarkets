@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { runJob } from "./run";
 import { catalogTcgdex } from "./jobs/catalog-tcgdex";
+import { catalogLimitless } from "./jobs/catalog-limitless";
 import { fxDaily } from "./jobs/fx-daily";
 import { ebaySold } from "./jobs/ebay-sold";
 import { yahooAuctionsJob } from "./jobs/yahoo-auctions";
@@ -14,6 +15,7 @@ import { estimatesJob } from "./jobs/estimates";
 const [name, ...flags] = process.argv.slice(2);
 const jobs = {
   "catalog:tcgdex": catalogTcgdex,
+  "catalog:limitless": catalogLimitless,
   "fx:daily": fxDaily,
   "ebay:sold": ebaySold,
   "yahoo:auctions": yahooAuctionsJob,

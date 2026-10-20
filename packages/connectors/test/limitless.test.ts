@@ -1,7 +1,7 @@
 // packages/connectors/test/limitless.test.ts
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { parseSetIndex, parseSetList, mergeSetPages, parseLimitlessDate, imageUrl, logoUrl } from "../src/limitless/parse";
+import { parseSetIndex, parseSetList, mergeSetPages, parseLimitlessDate, imageUrl, logoUrl, bareJaSetName } from "../src/limitless/parse";
 
 const fx = (f: string) => readFileSync(new URL(`./fixtures/${f}`, import.meta.url), "utf8");
 
@@ -47,5 +47,10 @@ describe("limitless helpers", () => {
   it("builds image and logo URLs", () => {
     expect(imageUrl("https://x/tpc/SV11B/SV11B_1_R_JP_XS.png", "SM")).toBe("https://x/tpc/SV11B/SV11B_1_R_JP_SM.png");
     expect(logoUrl("SV8a")).toBe("https://s3.limitlesstcg.com/sets/jp/SV8a.png");
+  });
+  it("unwraps Japanese set titles", () => {
+    expect(bareJaSetName("拡張パック「ブラックボルト」")).toBe("ブラックボルト");
+    expect(bareJaSetName("  ブラックボルト ")).toBe("ブラックボルト");
+    expect(bareJaSetName(null)).toBeNull();
   });
 });

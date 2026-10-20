@@ -12,3 +12,4 @@ export * from "./estimate";
 export * from "./pc-link";
 export * from "./card-query";
 export * from "./names/translate";
+export * from "./limitless-merge";
