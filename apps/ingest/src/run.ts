@@ -4,7 +4,7 @@ export interface JobContext { db: Db; log: (m: string) => void }
 export interface JobStats { items_seen: number; items_new: number; items_updated: number; suspect?: boolean }
 export type Job = (ctx: JobContext) => Promise<JobStats>;
 
-const KILL_SWITCH: Record<string, string> = { "yahoo:auctions": "CONNECTOR_YAHOO_AUC", "ebay:sold": "CONNECTOR_THECARDAPI", "ebay:sold-comps": "CONNECTOR_SOLDCOMPS" };
+const KILL_SWITCH: Record<string, string> = { "yahoo:auctions": "CONNECTOR_YAHOO_AUC", "ebay:sold": "CONNECTOR_THECARDAPI", "ebay:sold-comps": "CONNECTOR_SOLDCOMPS", "pricecharting:csv": "CONNECTOR_PRICECHARTING" };
 
 export async function runJob(name: string, job: Job, opts: { db?: Db; env?: NodeJS.ProcessEnv } = {}): Promise<"ok" | "failed" | "suspect" | "skipped"> {
   const env = opts.env ?? process.env;
