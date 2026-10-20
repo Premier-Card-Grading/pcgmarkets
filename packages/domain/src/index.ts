@@ -11,3 +11,4 @@ export * from "./pricing";
 export * from "./estimate";
 export * from "./pc-link";
 export * from "./card-query";
+export * from "./names/translate";
