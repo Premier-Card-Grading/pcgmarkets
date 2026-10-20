@@ -22,3 +22,4 @@ export async function getSet(code: string): Promise<LimitlessSetPage> {
   const en = parseSetList(await page(`${url}&translate=en`));
   return mergeSetPages(code, ja, en);
 }
+export * from "./ja-set-map";
