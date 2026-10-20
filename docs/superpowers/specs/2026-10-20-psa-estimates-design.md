@@ -111,9 +111,9 @@ alter table pc_set_map enable row level security;
 alter table pc_product_links enable row level security;
 alter table price_estimates enable row level security;   -- no public policy on the table itself
 
--- Public read goes through a view that omits pct and import_id.
+-- Public read goes through a view that omits pct, import_id and era.
 create view public_price_estimates as
-  select product_id, grade_value, estimate_usd, era, source_as_of from price_estimates;
+  select product_id, grade_value, estimate_usd, source_as_of from price_estimates;
 grant select on public_price_estimates to anon, authenticated;
 ```
 

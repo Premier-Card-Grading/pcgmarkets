@@ -1,7 +1,9 @@
 -- packages/db/migrations/0005_psa_estimates.sql
 -- PSA-based price estimates (spec: docs/superpowers/specs/2026-10-20-psa-estimates-design.md).
 -- pc_* tables and price_estimates are service-role only. The public reads public_price_estimates, which has no pct,
--- so the PSA price cannot be recovered as estimate / pct.
+-- so the PSA price cannot be recovered as estimate / pct. era stays on the private table for ops; the public view omits it.
+
+begin;
 
 create table pc_imports (
   id          uuid primary key default gen_random_uuid(),
@@ -61,7 +63,7 @@ alter table price_estimates enable row level security;
 revoke all on pc_imports, pc_products, pc_set_map, pc_product_links, price_estimates from anon, authenticated;
 
 create view public_price_estimates as
-  select product_id, grade_value, estimate_usd, era, source_as_of from price_estimates;
+  select product_id, grade_value, estimate_usd, source_as_of from price_estimates;
 -- Auto-updatable view with owner privileges: strip Supabase default grants so anon cannot write through it.
 revoke all on public_price_estimates from public, anon, authenticated;
 grant select on public_price_estimates to anon, authenticated;
@@ -79,3 +81,5 @@ begin
   return n;
 end $$;
 revoke execute on function replace_price_estimates(jsonb) from public, anon, authenticated;
+
+commit;

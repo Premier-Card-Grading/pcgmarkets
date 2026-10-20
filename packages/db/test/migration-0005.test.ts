@@ -11,10 +11,11 @@ describe("0005_psa_estimates", () => {
   it("creates no policy on any new table (only the view is public)", () => {
     for (const t of PRIVATE) expect(sql).not.toMatch(new RegExp(`create policy[^;]* on ${t}\\b`));
   });
-  it("public view omits pct and import_id", () => {
+  it("public view omits pct, import_id and era", () => {
     const view = sql.slice(sql.indexOf("create view public_price_estimates"), sql.indexOf(";", sql.indexOf("create view public_price_estimates")));
     expect(view).not.toContain("pct");
     expect(view).not.toContain("import_id");
+    expect(view).not.toMatch(/\bera\b/);
     expect(sql).toContain("grant select on public_price_estimates to anon, authenticated");
   });
   it("revokes default grants on the private tables from anon and authenticated", () => {
@@ -27,6 +28,15 @@ describe("0005_psa_estimates", () => {
   });
   it("keeps the RPC away from anon", () => {
     expect(sql).toContain("revoke execute on function replace_price_estimates(jsonb) from public, anon, authenticated");
+  });
+  it("runs as one transaction", () => {
+    const body = sql.split("\n").filter((l) => l.trim() && !l.trim().startsWith("--")).join("\n").trim();
+    expect(body.startsWith("begin;")).toBe(true);
+    expect(body.endsWith("commit;")).toBe(true);
+  });
+  it("keeps era on the private table", () => {
+    const table = sql.slice(sql.indexOf("create table price_estimates"), sql.indexOf(");", sql.indexOf("create table price_estimates")));
+    expect(table).toMatch(/\bera\b/);
   });
   it("enforces the 60–90% band in the schema", () => {
     expect(sql).toContain("check (pct >= 0.60 and pct <= 0.90)");
