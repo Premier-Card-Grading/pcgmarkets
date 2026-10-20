@@ -43,6 +43,24 @@ describe("parsePcCsv", () => {
   it("reports missing required columns", () => {
     expect(parsePcCsv("id,console-name,product-name\n1,a,b #1\n").missing).toEqual(["manual-only-price", "sales-volume"]);
   });
+  it("keeps only whole non-negative sales volumes; anything else is null", () => {
+    const cols = headerLine.split(",");
+    const vi = cols.indexOf("sales-volume");
+    const withVol = (v: string) => {
+      const cells = row5001.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/);
+      cells[vi] = v;
+      return parsePcCsv(`${headerLine}\n${cells.join(",")}\n`).rows[0]!.salesVolume;
+    };
+    expect(withVol('"1,234"')).toBe(1234);
+    expect(withVol("0")).toBe(0);
+    expect(withVol("")).toBeNull();
+    expect(withVol("12.5")).toBeNull();
+    expect(withVol("-3")).toBeNull();
+    expect(withVol("Infinity")).toBeNull();
+    expect(withVol("abc")).toBeNull();
+    expect(withVol("3000000000")).toBeNull(); // over int4
+    expect(withVol("1e400")).toBeNull();
+  });
   it("strips a leading byte order mark before reading the header", () => {
     const withBom = parsePcCsv("\uFEFF" + text);
     expect(withBom.missing).toEqual([]);

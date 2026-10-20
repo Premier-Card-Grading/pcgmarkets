@@ -15,6 +15,14 @@ export function parseMoney(s: string | undefined): number | null {
   return Number.isFinite(v) && v > 0 ? Math.round(v * 100) / 100 : null;
 }
 
+/** A whole, non-negative count; anything else (blank, fractional, negative, non-finite) is null. */
+export function parseSalesVolume(s: string | undefined): number | null {
+  const t = (s ?? "").replace(/[,\s]/g, "");
+  if (!t) return null;
+  const v = Number(t);
+  return Number.isInteger(v) && v >= 0 && v <= 2147483647 ? v : null; // pc_products.sales_volume is int4
+}
+
 export function parsePcCsv(text: string): { rows: PcRow[]; missing: string[]; malformed: number } {
   const [header = [], ...body] = parseCsv(text.replace(/^\uFEFF/, ""));
   const col = new Map(header.map((h, i) => [h.trim(), i]));
@@ -33,9 +41,7 @@ export function parsePcCsv(text: string): { rows: PcRow[]; missing: string[]; ma
       const v = parseMoney(get(r, c));
       if (v != null) pricesUsd[k] = v;
     }
-    const salesRaw = (get(r, "sales-volume") ?? "").replace(/,/g, "");
-    const vol = Number(salesRaw);
-    rows.push({ pcId, consoleName, productName, cardNumber: extractPcNumber(productName), salesVolume: salesRaw !== "" && Number.isFinite(vol) ? vol : null, pricesUsd });
+    rows.push({ pcId, consoleName, productName, cardNumber: extractPcNumber(productName), salesVolume: parseSalesVolume(get(r, "sales-volume")), pricesUsd });
   }
   return { rows, missing, malformed };
 }
