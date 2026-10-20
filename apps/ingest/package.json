@@ -2,11 +2,17 @@
   "name": "@pcg/ingest",
   "version": "0.0.1",
   "type": "module",
-  "scripts": { "start": "tsx src/cli.ts", "test": "vitest run", "typecheck": "tsc --noEmit", "smoke": "tsx src/smoke.ts" },
+  "scripts": {
+    "start": "tsx src/cli.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "smoke": "tsx src/smoke.ts"
+  },
   "dependencies": {
-    "@pcg/domain": "workspace:*",
-    "@pcg/db": "workspace:*",
     "@pcg/connectors": "workspace:*",
-    "dotenv": "^16.4.0"
+    "@pcg/db": "workspace:*",
+    "@pcg/domain": "workspace:*",
+    "dotenv": "^16.4.0",
+    "sharp": "^0.33.5"
   }
 }

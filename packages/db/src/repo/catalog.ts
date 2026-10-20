@@ -48,3 +48,20 @@ export async function loadSetIds(db: Db, language: Language): Promise<Set<string
 export async function loadSetRow(db: Db, id: string): Promise<SetRow | null> {
   return must(await db.from("sets").select("id,printed_code,language,name_en,name_ja,release_date,card_count,aliases,logo_url,series,source,limitless_code").eq("id", id).maybeSingle()) as SetRow | null;
 }
+
+export async function loadJaImageWork(db: Db, opts: { replaceLimitless: boolean }) {
+  const sets = await selectAll<{ id: string; printed_code: string | null; limitless_code: string | null; logo_url: string | null; source: string }>((f, t) =>
+    db.from("sets").select("id,printed_code,limitless_code,logo_url,source").eq("language", "ja").order("id").range(f, t));
+  const code = (s: (typeof sets)[number]) => s.limitless_code ?? s.printed_code ?? s.id;
+  const owned = sets.filter((s) => s.source === "limitless");
+  const cards: { id: string; set_id: string; code: string; number: string }[] = [];
+  for (const s of owned) {
+    const rows = await selectAll<{ id: string; number_num: number | null; number_printed: string; image_url: string | null; image_source: string | null }>((f, t) =>
+      db.from("products").select("id,number_num,number_printed,image_url,image_source").eq("set_id", s.id).order("id").range(f, t));
+    for (const p of rows) if (p.image_url == null || (opts.replaceLimitless && p.image_source === "limitless"))
+      cards.push({ id: p.id, set_id: s.id, code: code(s), number: p.number_num != null ? String(p.number_num) : p.number_printed });
+  }
+  return { sets: sets.filter((s) => s.logo_url == null).map((s) => ({ id: s.id, code: code(s) })), cards };
+}
+export async function setLogoUrl(db: Db, setId: string, url: string) { must(await db.from("sets").update({ logo_url: url }).eq("id", setId)); }
+export async function setCardImage(db: Db, productId: string, url: string) { must(await db.from("products").update({ image_url: url, image_source: "limitless" }).eq("id", productId)); }

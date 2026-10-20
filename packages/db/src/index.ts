@@ -10,3 +10,4 @@ export * from "./repo/fx";
 export * from "./paginate";
 export * from "./repo/pricecharting";
 export * from "./repo/estimates";
+export * from "./repo/storage";
