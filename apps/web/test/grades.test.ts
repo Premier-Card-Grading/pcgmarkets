@@ -54,6 +54,13 @@ describe("estimate options", () => {
   it("treats a grade that sold only outside the current window as real, so it gets no estimate", () => {
     expect(estimateOptions([pt(9.5, "any", 1, "all"), pt(9.5, "any", 0, "90d")], [est(9.5, 40)], now)).toEqual([]);
   });
+  it("treats any grade in the sales list as real, so a grade with only a best-offer sale gets no estimate", () => {
+    const opts = estimateOptions([], [est(9, 50), est(10, 84)], now, [sale(5, 45, 9, null, true)]);
+    expect(opts.map((o) => o.key)).toEqual(["10e"]);
+  });
+  it("treats a sale with no USD price as real too", () => {
+    expect(estimateOptions([], [est(8, 30)], now, [{ ...sale(5, 30, 8), price_usd: null }])).toEqual([]);
+  });
   it("drops estimates older than ESTIMATE_MAX_AGE_DAYS", () => {
     expect(estimateOptions([], [est(10, 84, ESTIMATE_MAX_AGE_DAYS + 1)], now)).toEqual([]);
   });

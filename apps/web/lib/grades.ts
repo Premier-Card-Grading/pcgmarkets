@@ -23,9 +23,15 @@ export function gradeOptions(points: PricePointRow[], window: Window): GradeOpti
   return out;
 }
 export const ESTIMATE_MAX_AGE_DAYS = 14;
-/** Estimated grades: only where the card has never had a PCG sale at that grade (any window), and the source is fresh. */
-export function estimateOptions(points: PricePointRow[], estimates: EstimateRow[], now: Date): GradeOption[] {
-  const real = new Set(points.filter((p) => p.n_sales > 0).map((p) => Number(p.grade_value)));
+/**
+ * Estimated grades: only where the card has never had a PCG sale at that grade (any window), and the source is fresh.
+ * A grade counts as sold if it has a price point or ANY matched sale, best offers and unpriced sales included.
+ */
+export function estimateOptions(points: PricePointRow[], estimates: EstimateRow[], now: Date, sales: SaleRow[] = []): GradeOption[] {
+  const real = new Set([
+    ...points.filter((p) => p.n_sales > 0).map((p) => Number(p.grade_value)),
+    ...sales.filter((s) => s.grade_value != null).map((s) => Number(s.grade_value)),
+  ]);
   const maxAge = ESTIMATE_MAX_AGE_DAYS * 86400000;
   return estimates
     .filter((e) => !real.has(Number(e.grade_value)) && now.getTime() - new Date(e.source_as_of).getTime() <= maxAge)

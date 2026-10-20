@@ -14,7 +14,7 @@ export function CardView({ data, now }: { data: CardPageData; now: string }) {
   const window: Window = isWindow(sp.get("w")) ? (sp.get("w") as Window) : "90d";
   const nowD = new Date(now);
   const real = gradeOptions(data.points, window);
-  const options = [...real, ...estimateOptions(data.points, data.estimates, nowD)];
+  const options = [...real, ...estimateOptions(data.points, data.estimates, nowD, data.sales)];
   const key = options.some((o) => o.key === sp.get("g")) ? sp.get("g")! : defaultGradeKey(options);
   const opt = options.find((o) => o.key === key);
   const set = (k: string, v: string) => { const q = new URLSearchParams(sp.toString()); q.set(k, v); router.replace(`?${q.toString()}`, { scroll: false }); };
