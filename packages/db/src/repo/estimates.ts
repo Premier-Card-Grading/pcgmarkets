@@ -7,7 +7,7 @@ export interface EstimateRowInput { product_id: string; grade_value: number; est
 /** Every (product, grade) with a real PCG price in ANY window. The 'all' window is the superset. */
 export async function loadPcgGradedPairs(db: Db): Promise<Set<string>> {
   const rows = await selectAll<{ product_id: string; grade_value: number }>((f, t) =>
-    db.from("price_points").select("product_id,grade_value").eq("window", "all").gt("n_sales", 0).order("product_id").range(f, t));
+    db.from("price_points").select("product_id,grade_value").eq("window", "all").gt("n_sales", 0).order("product_id").order("grade_value").order("grade_label").range(f, t));
   return new Set(rows.map((r) => gradedKey(r.product_id, Number(r.grade_value))));
 }
 

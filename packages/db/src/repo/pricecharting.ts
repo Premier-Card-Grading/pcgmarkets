@@ -23,11 +23,13 @@ export async function upsertPcProducts(db: Db, importId: string, rows: PcProduct
     must(await db.from("pc_products").upsert(chunk, { onConflict: "pc_id" }));
   }
 }
+/** Call only after a complete upsert, before finishImport("ok"): the cascade drops links for vanished products. */
 export async function deleteStalePcProducts(db: Db, importId: string) {
   must(await db.from("pc_products").delete().neq("import_id", importId));
 }
 export async function loadSetMap(db: Db) {
-  const rows = must(await db.from("pc_set_map").select("set_id,console_name,era_override")) as { set_id: string; console_name: string; era_override: Era | null }[];
+  const rows = await selectAll<{ set_id: string; console_name: string; era_override: Era | null }>((f, t) =>
+    db.from("pc_set_map").select("set_id,console_name,era_override").order("set_id").range(f, t));
   return rows.map((r) => ({ setId: r.set_id, consoleName: r.console_name, eraOverride: r.era_override }));
 }
 export async function loadPcProductsForConsoles(db: Db, consoles: string[]) {
@@ -52,6 +54,7 @@ export async function loadOverriddenPcIds(db: Db): Promise<Set<string>> {
   const rows = await selectAll<{ pc_id: string }>((f, t) => db.from("pc_product_links").select("pc_id").eq("is_override", true).order("pc_id").range(f, t));
   return new Set(rows.map((r) => r.pc_id));
 }
+/** Writes is_override: false, so callers must exclude loadOverriddenPcIds results first. */
 export async function upsertPcLinks(db: Db, rows: { pc_id: string; state: "linked" | "needs_review"; product_id: string | null; review_reason: string | null }[]) {
   for (let i = 0; i < rows.length; i += CHUNK) {
     const chunk = rows.slice(i, i + CHUNK).map((r) => ({ ...r, is_override: false, updated_at: new Date().toISOString() }));
