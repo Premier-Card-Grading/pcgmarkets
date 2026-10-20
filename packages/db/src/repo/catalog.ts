@@ -19,7 +19,7 @@ export async function upsertProducts(db: Db, rows: ProductRow[]) {
 }
 
 export async function loadLimitlessOwnedSetIds(db: Db): Promise<Set<string>> {
-  const rows = must(await db.from("sets").select("id").eq("source", "limitless")) as { id: string }[];
+  const rows = await selectAll<{ id: string }>((f, t) => db.from("sets").select("id").eq("source", "limitless").order("id").range(f, t));
   return new Set(rows.map((r) => r.id));
 }
 
