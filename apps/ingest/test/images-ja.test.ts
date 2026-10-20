@@ -1,3 +1,4 @@
+import { PausedError } from "@pcg/connectors";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const calls = { logo: [] as string[], card: [] as string[], uploads: [] as string[] };
@@ -24,11 +25,41 @@ describe("images:ja", () => {
       if (url.includes("SV11B_2_")) return new Response("<html>", { headers: { "content-type": "text/html" } });
       return png.clone();
     }) as unknown as typeof fetch;
-    const stats = await imagesJa({ size: "SM", fetchImpl, toWebp: async (b) => b })({ db: {} as never, log: () => {} });
+    const stats = await imagesJa({ size: "SM", fetchImpl, toWebp: async (b) => b, sleep: async () => {} })({ db: {} as never, log: () => {} });
     expect(cardImageUrl("SV11B", "1", "SM")).toBe("https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpc/SV11B/SV11B_1_R_JP_SM.png");
     expect(calls.logo).toEqual(["SV11B"]);
     expect(calls.card).toEqual(["SV11B-001"]);
     expect(calls.uploads).toEqual(["set-logos/ja/SV11B.png", "card-images/ja/SV11B/SV11B-001.webp"]);
     expect(stats).toMatchObject({ items_seen: 4, items_new: 2 });
+  });
+
+  it("stops both workers when a card returns 403", async () => {
+    const { imagesJa } = await import("../src/jobs/images-ja");
+    const db = await import("@pcg/db");
+    vi.mocked(db.loadJaImageWork).mockResolvedValueOnce({
+      sets: [],
+      cards: [1, 2, 3, 4, 5, 6].map((n) => ({ id: `SV11B-00${n}`, set_id: "SV11B", code: "SV11B", number: String(n) })),
+    });
+    const urls: string[] = [];
+    const fetchImpl = vi.fn(async (url: string) => {
+      urls.push(url);
+      if (url.includes("SV11B_1_")) return new Response("no", { status: 403 });
+      return png.clone();
+    }) as unknown as typeof fetch;
+    await expect(imagesJa({ size: "SM", fetchImpl, toWebp: async (b) => b, sleep: async () => {} })({ db: {} as never, log: () => {} })).rejects.toBeInstanceOf(PausedError);
+    expect(urls.length).toBeLessThanOrEqual(2);
+  });
+
+  it("skips a card whose conversion throws and keeps going", async () => {
+    const { imagesJa } = await import("../src/jobs/images-ja");
+    const logs: string[] = [];
+    const fetchImpl = vi.fn(async () => png.clone()) as unknown as typeof fetch;
+    let n = 0;
+    const toWebp = async (b: Buffer) => { n += 1; if (n === 1) throw new Error("corrupt"); return b; };
+    const stats = await imagesJa({ size: "LG", fetchImpl, toWebp, sleep: async () => {} })({ db: {} as never, log: (m) => logs.push(m) });
+    expect(calls.logo).toEqual(["SV11B", "XX"]);
+    expect(calls.card).toHaveLength(1);
+    expect(logs.some((m) => m.includes("corrupt"))).toBe(true);
+    expect(stats).toMatchObject({ items_seen: 4, items_new: 3 });
   });
 });
