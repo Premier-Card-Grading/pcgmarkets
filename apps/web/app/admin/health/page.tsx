@@ -8,11 +8,12 @@ import { SectionHead } from "@/components/SectionHead";
 import { relativeTime } from "@/lib/format";
 export const dynamic = "force-dynamic";
 const SRC: Record<string, string> = { "soldcomps/sold": "eBay sold · SoldComps", "thecardapi/sold": "eBay sold · The Card API", "yahoo_auc/ended": "Yahoo! Auctions ended", "yahoo_auc/sold": "Yahoo! Auctions sold" };
-const SWITCHES = [["The Card API", "CONNECTOR_THECARDAPI"], ["Yahoo! Auctions", "CONNECTOR_YAHOO_AUC"], ["SoldComps", "CONNECTOR_SOLDCOMPS"]] as const;
+const SWITCHES = [["The Card API", "CONNECTOR_THECARDAPI"], ["Yahoo! Auctions", "CONNECTOR_YAHOO_AUC"], ["SoldComps", "CONNECTOR_SOLDCOMPS"], ["PriceCharting", "CONNECTOR_PRICECHARTING"]] as const;
 export default async function Health() {
   const db = serviceClient(); const now = new Date();
-  const [{ data: runs }, { data: state }, { data: bySource }, { data: byState }] = await Promise.all([
-    db.from("ingest_runs").select("*").order("started_at", { ascending: false }).limit(40), db.from("connector_state").select("*"), db.from("raw_listings").select("source,kind"), db.from("listing_matches").select("state")]);
+  const [{ data: runs }, { data: state }, { data: bySource }, { data: byState }, { data: pcImp }] = await Promise.all([
+    db.from("ingest_runs").select("*").order("started_at", { ascending: false }).limit(40), db.from("connector_state").select("*"), db.from("raw_listings").select("source,kind"), db.from("listing_matches").select("state"),
+    db.from("pc_imports").select("fetched_at,status").eq("status", "ok").order("fetched_at", { ascending: false }).limit(1)]);
   const tally = <T,>(rows: T[] | null, key: (r: T) => string) => { const m = new Map<string, number>(); for (const r of rows ?? []) m.set(key(r), (m.get(key(r)) ?? 0) + 1); return m; };
   const src = tally(bySource as { source: string; kind: string }[] | null, (r) => `${r.source}/${r.kind}`); const st = tally(byState as { state: string }[] | null, (r) => r.state);
   const jobs = summarise((runs ?? []) as Run[]); const failed = jobs.filter((j) => j.status === "failed").length, suspect = jobs.filter((j) => j.status === "suspect").length;
@@ -28,6 +29,7 @@ export default async function Health() {
         <tr><td className="border-b-2 border-ink py-[9px] font-extrabold">Matched</td><td className="border-b-2 border-ink py-[9px] text-right font-extrabold tnum">{(st.get("matched") ?? 0).toLocaleString("en-US")}</td></tr>
         <tr><td className={`${kv} font-medium text-ink-2`}>Needs review</td><td className={`${kv} text-right font-bold tnum`}>{st.get("needs_review") ?? 0}</td></tr><tr><td className={`${kv} font-medium text-ink-2`}>Rejected</td><td className={`${kv} text-right font-bold tnum`}>{(st.get("rejected") ?? 0).toLocaleString("en-US")}</td></tr></tbody></table></section>
       <section><SectionHead title="Connectors" /><table className="w-full border-collapse text-[14.5px]"><tbody>
+        <tr><td className={`${kv} font-medium text-ink-2`}>PriceCharting CSV</td><td className={`${kv} text-right text-[13px] text-mute`}>{pcImp?.[0] ? relativeTime(pcImp[0].fetched_at, now) : "never imported"}</td></tr>
         {((state ?? []) as { connector: string; cursor: unknown }[]).map((c) => <tr key={c.connector}><td className={`${kv} font-medium text-ink-2`}>{c.connector} cursor</td><td className={`${kv} text-right text-[13px] text-mute`}>{formatCursor(c.cursor)}</td></tr>)}
         {SWITCHES.map(([label, env]) => <tr key={env}><td className={`${kv} font-medium text-ink-2`}>{label}</td><td className={`${kv} text-right`}><StatusPill tone={process.env[env] === "off" ? "bad" : "ok"}>{process.env[env] === "off" ? "Off" : "On"}</StatusPill></td></tr>)}</tbody></table></section>
     </div>

@@ -29,6 +29,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
   const { data: rows } = await qy;
 
   const { data: fx } = await db.from("fx_rates").select("base,rate").eq("quote", "USD").order("date", { ascending: false }).limit(20);
+  const { count: pcCount } = await db.from("pc_product_links").select("pc_id", { count: "exact", head: true }).eq("state", "needs_review");
   const rate = new Map((fx ?? []).map((f: { base: string; rate: number }) => [f.base, Number(f.rate)]));
 
   const items: ReviewItemData[] = (rows ?? []).map((r) => {
@@ -86,6 +87,7 @@ export default async function Review({ searchParams }: { searchParams: Promise<{
             {l} <b className={`font-extrabold ${(reason ?? "") === k ? "text-gold-badge" : "text-mute"}`}>{n}</b>
           </ChipLink>
         ))}
+        {(pcCount ?? 0) > 0 && <ChipLink href="/admin/review/pricecharting" className="shrink-0 gap-[7px]">PriceCharting links <b className="font-extrabold text-mute">{pcCount}</b></ChipLink>}
       </div>
       <ReviewList items={items} total={shown} />
     </>
