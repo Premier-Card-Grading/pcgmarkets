@@ -19,10 +19,17 @@ export async function listCards(ptcgSet: string): Promise<PtcgCard[]> {
 }
 
 export function matchImages(ours: { id: string; number_printed: string; number_num: number | null }[], theirs: PtcgCard[]) {
-  const byNum = new Map(theirs.map((c) => [norm(c.number), c.small]));
+  // A number listed twice in one set is ambiguous: skip it rather than guess (wrong card is worse than none).
+  const byNum = new Map<string, string | null>();
+  for (const c of theirs) {
+    const k = norm(c.number);
+    byNum.set(k, byNum.has(k) ? null : c.small);
+  }
   const out: { id: string; url: string }[] = [];
   for (const p of ours) {
-    const url = byNum.get(p.number_num != null ? String(p.number_num) : norm(p.number_printed)) ?? byNum.get(norm(p.number_printed));
+    const keys = [p.number_num != null ? String(p.number_num) : norm(p.number_printed), norm(p.number_printed)];
+    const key = keys.find((k) => byNum.has(k));
+    const url = key === undefined ? null : byNum.get(key) ?? null;
     if (url) out.push({ id: p.id, url });
   }
   return out;

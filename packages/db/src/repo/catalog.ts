@@ -69,7 +69,11 @@ export async function loadEnMissingImages(db: Db) {
   const rows = await selectAll<{ id: string; set_id: string; number_printed: string; number_num: number | null }>((f, t) =>
     db.from("products").select("id,set_id,number_printed,number_num").eq("language", "en").is("image_url", null).order("id").range(f, t));
   const bySet = new Map<string, { id: string; number_printed: string; number_num: number | null }[]>();
-  for (const r of rows) bySet.set(r.set_id, [...(bySet.get(r.set_id) ?? []), r]);
+  for (const r of rows) {
+    const list = bySet.get(r.set_id);
+    if (list) list.push(r);
+    else bySet.set(r.set_id, [r]);
+  }
   return bySet;
 }
 export async function setCardImageFrom(db: Db, productId: string, url: string, source: "pokemontcg") {

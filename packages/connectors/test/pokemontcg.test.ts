@@ -20,3 +20,15 @@ describe("pokemontcg", () => {
     ]);
   });
 });
+
+describe("pokemontcg ambiguous numbers", () => {
+  it("skips a number listed twice in one set rather than picking one", () => {
+    const ours = [{ id: "x-005", number_printed: "005", number_num: 5 }, { id: "x-006", number_printed: "006", number_num: 6 }];
+    const theirs = [
+      { number: "5", small: "https://images.pokemontcg.io/x/5a.png" },
+      { number: "005", small: "https://images.pokemontcg.io/x/5b.png" },
+      { number: "6", small: "https://images.pokemontcg.io/x/6.png" },
+    ];
+    expect(matchImages(ours, theirs)).toEqual([{ id: "x-006", url: "https://images.pokemontcg.io/x/6.png" }]);
+  });
+});
