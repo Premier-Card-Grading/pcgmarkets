@@ -10,3 +10,5 @@ export type { SoldCompsCursor } from "./soldcomps";
 export { SOLDCOMPS } from "./soldcomps/schema";
 export * from "./fx";
 export * from "./pcg";
+export { parseCsv, parseMoney, parsePcCsv, checkImport, downloadPcCsv, PRICECHARTING } from "./pricecharting";
+export type { PcRow } from "./pricecharting";
