@@ -44,3 +44,7 @@ export async function loadSetIds(db: Db, language: Language): Promise<Set<string
   const rows = await selectAll<{ id: string }>((f, t) => db.from("sets").select("id").eq("language", language).order("id").range(f, t));
   return new Set(rows.map((r) => r.id));
 }
+
+export async function loadSetRow(db: Db, id: string): Promise<SetRow | null> {
+  return must(await db.from("sets").select("id,printed_code,language,name_en,name_ja,release_date,card_count,aliases,logo_url,series,source,limitless_code").eq("id", id).maybeSingle()) as SetRow | null;
+}
