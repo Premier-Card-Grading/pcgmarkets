@@ -28,7 +28,10 @@ describe("pcKeyForGrade", () => {
 
 describe("percentileRanks", () => {
   it("maps lowest to 0 and highest to 1", () => expect(percentileRanks([5, 1, 9])).toEqual([0.5, 0, 1]));
-  it("gives ties the average rank", () => expect(percentileRanks([1, 3, 3, 9])).toEqual([0, 0.5, 0.5, 1]));
+  it("gives ties the share of values strictly below them", () => {
+    const r = percentileRanks([1, 3, 3, 9]);
+    [0, 1 / 3, 1 / 3, 1].forEach((v, i) => expect(r[i]).toBeCloseTo(v, 10));
+  });
   it("returns 0 for a single value", () => expect(percentileRanks([7])).toEqual([0]));
 });
 
@@ -51,6 +54,17 @@ describe("computeEstimates", () => {
     const vintage = Array.from({ length: MIN_GROUP }, (_, i) => card(100 + i, i, { "10": 100 }, { era: "vintage" }));
     const out = computeEstimates([...modern, ...vintage], new Set());
     expect(out.find((e) => e.productId === `p${100 + MIN_GROUP - 1}`)!.pct).toBe(0.9); // best-selling vintage card
+  });
+  it("puts an all-zero group at 60%", () => {
+    const out = computeEstimates(Array.from({ length: MIN_GROUP }, (_, i) => card(i, 0, { "10": 100 })), new Set());
+    expect(new Set(out.map((e) => e.pct))).toEqual(new Set([0.6]));
+  });
+  it("puts zero-volume cards at 60% even when they are half the group", () => {
+    const zeros = Array.from({ length: 10 }, (_, i) => card(i, 0, { "10": 100 }));
+    const sold = Array.from({ length: 10 }, (_, i) => card(10 + i, i + 1, { "10": 100 }));
+    const out = computeEstimates([...zeros, ...sold], new Set());
+    for (let i = 0; i < 10; i++) expect(out.find((e) => e.productId === `p${i}`)!.pct).toBe(0.6);
+    expect(out.find((e) => e.productId === "p19")!.pct).toBe(0.9);
   });
   it("treats null sales volume as 0", () => {
     const cards = [...group(MIN_GROUP - 1).map((c) => ({ ...c, salesVolume: (c.salesVolume ?? 0) + 1 })), card(99, null, { "10": 100 })];

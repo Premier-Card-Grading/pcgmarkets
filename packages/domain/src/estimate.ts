@@ -33,7 +33,7 @@ export function pcKeyForGrade(g: number): PcGradeKey | null {
   return null;
 }
 
-/** Rank scaled to [0,1]: lowest 0, highest 1, ties share the average rank. A single value gets 0. */
+/** Share of the other values strictly below each value, scaled to [0,1]: lowest 0, a unique highest 1. Ties share the lowest rank of their group, so a pile of zero-volume cards all sit at 0. A single value gets 0. */
 export function percentileRanks(values: number[]): number[] {
   const n = values.length;
   if (n <= 1) return values.map(() => 0);
@@ -42,7 +42,7 @@ export function percentileRanks(values: number[]): number[] {
   for (let s = 0; s < n; ) {
     let e = s;
     while (e + 1 < n && order[e + 1]!.v === order[s]!.v) e++;
-    const r = (s + e) / 2 / (n - 1);
+    const r = s / (n - 1);
     for (let k = s; k <= e; k++) out[order[k]!.i] = r;
     s = e + 1;
   }

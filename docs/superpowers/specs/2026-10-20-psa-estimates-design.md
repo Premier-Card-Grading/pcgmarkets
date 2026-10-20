@@ -173,7 +173,7 @@ The pure function `computeEstimates(input) → Estimate[]` in `packages/domain/s
 - The boundaries are exported constants.
 
 **Popularity percentile:**
-- Within each `(language, era)` group of linked cards, compute `p` = the card's percentile rank by `sales_volume`. The lowest card in the group gets 0 and the highest gets 1. Ties share the average rank. A null `sales_volume` counts as 0.
+- Within each `(language, era)` group of linked cards, compute `p` = the card's percentile rank by `sales_volume`. The lowest card in the group gets 0 and the highest gets 1. `p` is the share of the other cards with strictly lower volume, so ties share the lowest rank of their group: cards with no sales all sit at 60%. A null `sales_volume` counts as 0.
 - If a group has **fewer than 20** cards, every card in it gets `p = 0`, the conservative floor.
 
 **Estimate for each PCG grade:**
@@ -234,7 +234,7 @@ The pure function `computeEstimates(input) → Estimate[]` in `packages/domain/s
 ## 10. Testing
 
 - **Domain (`estimate.test.ts`):**
-  - The percentile mapping: endpoints 0.60 and 0.90, the midpoint, average rank for ties, null volume.
+  - The percentile mapping: endpoints 0.60 and 0.90, the midpoint, ties sharing the lowest rank (zero-volume cards at 60%), null volume.
   - The cap.
   - Era boundaries, including the exact boundary dates.
   - The small-group floor.
