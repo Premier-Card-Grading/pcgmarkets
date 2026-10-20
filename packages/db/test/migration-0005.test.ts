@@ -17,6 +17,14 @@ describe("0005_psa_estimates", () => {
     expect(view).not.toContain("import_id");
     expect(sql).toContain("grant select on public_price_estimates to anon, authenticated");
   });
+  it("revokes default grants on the private tables from anon and authenticated", () => {
+    expect(sql).toContain("revoke all on pc_imports, pc_products, pc_set_map, pc_product_links, price_estimates from anon, authenticated");
+  });
+  it("revokes all on the view before granting select, so anon cannot write through it", () => {
+    const revoke = sql.indexOf("revoke all on public_price_estimates from public, anon, authenticated");
+    expect(revoke).toBeGreaterThan(-1);
+    expect(revoke).toBeLessThan(sql.indexOf("grant select on public_price_estimates to anon, authenticated"));
+  });
   it("keeps the RPC away from anon", () => {
     expect(sql).toContain("revoke execute on function replace_price_estimates(jsonb) from public, anon, authenticated");
   });

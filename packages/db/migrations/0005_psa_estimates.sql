@@ -58,9 +58,12 @@ alter table pc_products enable row level security;
 alter table pc_set_map enable row level security;
 alter table pc_product_links enable row level security;
 alter table price_estimates enable row level security;
+revoke all on pc_imports, pc_products, pc_set_map, pc_product_links, price_estimates from anon, authenticated;
 
 create view public_price_estimates as
   select product_id, grade_value, estimate_usd, era, source_as_of from price_estimates;
+-- Auto-updatable view with owner privileges: strip Supabase default grants so anon cannot write through it.
+revoke all on public_price_estimates from public, anon, authenticated;
 grant select on public_price_estimates to anon, authenticated;
 
 -- Atomic replace: supabase-js has no client-side transactions.
