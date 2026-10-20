@@ -61,12 +61,26 @@ export async function upsertPcLinks(db: Db, rows: { pc_id: string; state: "linke
     must(await db.from("pc_product_links").upsert(chunk, { onConflict: "pc_id" }));
   }
 }
+/**
+ * Deletes auto (non-override) links whose pc_id is not in keepPcIds — rows left behind when a console is unmapped
+ * or remapped. Loads every auto link pc_id, diffs in memory, and deletes in chunks so large sets stay under URL limits.
+ */
+export async function deleteUnmappedAutoLinks(db: Db, keepPcIds: string[]): Promise<number> {
+  const keep = new Set(keepPcIds);
+  const rows = await selectAll<{ pc_id: string }>((f, t) => db.from("pc_product_links").select("pc_id").eq("is_override", false).order("pc_id").range(f, t));
+  const drop = rows.map((r) => r.pc_id).filter((id) => !keep.has(id));
+  for (let i = 0; i < drop.length; i += CHUNK) {
+    must(await db.from("pc_product_links").delete().eq("is_override", false).in("pc_id", drop.slice(i, i + CHUNK)));
+  }
+  return drop.length;
+}
 export async function loadLinkedForEstimates(db: Db) {
-  type Row = { product_id: string; pc_products: { sales_volume: number | null; prices_usd: Partial<Record<PcGradeKey, number>> } | null; products: { language: "ja" | "en"; set_id: string; sets: { release_date: string | null } | null } | null };
+  type Row = { product_id: string; is_override: boolean; pc_products: { console_name: string; sales_volume: number | null; prices_usd: Partial<Record<PcGradeKey, number>> } | null; products: { language: "ja" | "en"; set_id: string; sets: { release_date: string | null } | null } | null };
   const rows = await selectAll<Row>((f, t) =>
-    db.from("pc_product_links").select("product_id,pc_products(sales_volume,prices_usd),products(language,set_id,sets(release_date))").eq("state", "linked").order("pc_id").range(f, t) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>);
+    db.from("pc_product_links").select("product_id,is_override,pc_products(console_name,sales_volume,prices_usd),products(language,set_id,sets(release_date))").eq("state", "linked").order("pc_id").range(f, t) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>);
   return rows.filter((r) => r.pc_products && r.products).map((r) => ({
     productId: r.product_id, language: r.products!.language, setId: r.products!.set_id, releaseDate: r.products!.sets?.release_date ?? null,
     salesVolume: r.pc_products!.sales_volume, pricesUsd: r.pc_products!.prices_usd ?? {},
+    isOverride: r.is_override === true, consoleName: r.pc_products!.console_name,
   }));
 }

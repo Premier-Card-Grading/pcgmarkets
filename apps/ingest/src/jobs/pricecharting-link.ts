@@ -1,7 +1,7 @@
 // apps/ingest/src/jobs/pricecharting-link.ts
 import type { Job } from "../run";
 import type { Db } from "@pcg/db";
-import { loadSetMap, loadPcProductsForConsoles, loadLinkCandidates, loadOverriddenPcIds, upsertPcLinks, loadAllConsoleCounts } from "@pcg/db";
+import { loadSetMap, loadPcProductsForConsoles, loadLinkCandidates, loadOverriddenPcIds, upsertPcLinks, loadAllConsoleCounts, deleteUnmappedAutoLinks } from "@pcg/db";
 import { linkPcProduct, type LinkCandidate } from "@pcg/domain";
 
 export async function linkMapped(db: Db, log: (m: string) => void): Promise<{ linked: number; review: number }> {
@@ -29,6 +29,9 @@ export async function linkMapped(db: Db, log: (m: string) => void): Promise<{ li
     perSet.set(setId, s);
   }
   await upsertPcLinks(db, rows);
+  // Links for PriceCharting rows whose console is no longer mapped would otherwise linger and keep feeding estimates.
+  const deleted = await deleteUnmappedAutoLinks(db, pcRows.map((r) => r.pcId));
+  if (deleted) log(`deleted ${deleted} auto links for PriceCharting rows on consoles that are no longer mapped`);
   for (const [setId, s] of perSet) log(`${setId}: linked ${s.linked}/${s.total}${s.linked < s.total * 0.5 ? "  ← under 50% linked, check the console-name mapping" : ""}`);
   const counts = await loadAllConsoleCounts(db);
   const unmapped = [...counts.entries()].filter(([c]) => !setsByConsole.has(c)).sort((a, b) => b[1] - a[1]).slice(0, 20);

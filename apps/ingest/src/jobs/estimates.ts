@@ -13,15 +13,19 @@ export const estimatesJob: Job = async ({ db, log }) => {
   }
   const [linked, map, graded] = await Promise.all([loadLinkedForEstimates(db), loadSetMap(db), loadPcgGradedPairs(db)]);
   const override = new Map(map.map((m) => [m.setId, m.eraOverride]));
+  const consoleFor = new Map(map.map((m) => [m.setId, m.consoleName]));
   const inputs: EstimateInput[] = [];
-  let noEra = 0;
+  let noEra = 0, staleLinks = 0;
   for (const l of linked) {
+    // An auto link counts only while its console is still mapped to the card's set; admin overrides always count.
+    if (!l.isOverride && consoleFor.get(l.setId) !== l.consoleName) { staleLinks++; continue; }
     const era = eraFor(l.releaseDate, override.get(l.setId) ?? null);
     if (!era) { noEra++; continue; }
     inputs.push({ productId: l.productId, language: l.language, era, salesVolume: l.salesVolume, pricesUsd: l.pricesUsd });
   }
   const { unique, duplicates } = dropDuplicateProducts(inputs);
   if (duplicates.length) log(`skipped ${duplicates.length} products linked to several PriceCharting rows: ${duplicates.slice(0, 10).join(", ")}`);
+  if (staleLinks) log(`skipped ${staleLinks} auto links whose PriceCharting console is no longer mapped to the card's set`);
   if (noEra) log(`skipped ${noEra} cards with no release date and no era_override`);
   const est = computeEstimates(unique, graded);
   const n = await replaceEstimates(db, est.map((e) => ({ product_id: e.productId, grade_value: e.gradeValue, estimate_usd: e.estimateUsd, pct: e.pct, era: e.era, import_id: imp.id, source_as_of: imp.fetched_at })));

@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   upserted: 0, deletedStale: false, links: [] as unknown[], estimates: [] as unknown[],
   failUpsert: false,
   setMap: null as null | unknown[], pcRows: null as null | unknown[], cands: null as null | unknown[],
+  keptPcIds: null as null | string[], deletedAuto: 0, linkedForEstimates: null as null | unknown[],
 }));
 vi.mock("@pcg/db", () => ({
   lastOkImport: async () => state.lastOk,
@@ -25,9 +26,10 @@ vi.mock("@pcg/db", () => ({
   loadLinkCandidates: async () => state.cands ?? [{ id: "sv03.5-200", setId: "sv03.5", numberNum: 200, numberPrinted: "200/165" }, { id: "sv03.5-9", setId: "sv03.5", numberNum: 9, numberPrinted: "009/165" }],
   loadOverriddenPcIds: async () => new Set(["5009"]),
   upsertPcLinks: async (_db: unknown, rows: unknown[]) => { state.links = rows; },
-  loadLinkedForEstimates: async () => [
-    { productId: "sv03.5-200", language: "en", setId: "sv03.5", releaseDate: "2023-09-22", salesVolume: 412, pricesUsd: { "10": 1240, "9": 110 } },
-    { productId: "nodate-1", language: "en", setId: "x", releaseDate: null, salesVolume: 1, pricesUsd: { "10": 10 } },
+  deleteUnmappedAutoLinks: async (_db: unknown, keep: string[]) => { state.keptPcIds = keep; return state.deletedAuto; },
+  loadLinkedForEstimates: async () => state.linkedForEstimates ?? [
+    { productId: "sv03.5-200", language: "en", setId: "sv03.5", releaseDate: "2023-09-22", salesVolume: 412, pricesUsd: { "10": 1240, "9": 110 }, isOverride: false, consoleName: "Pokemon Scarlet & Violet 151" },
+    { productId: "nodate-1", language: "en", setId: "x", releaseDate: null, salesVolume: 1, pricesUsd: { "10": 10 }, isOverride: true, consoleName: "Pokemon Other" },
   ],
   loadPcgGradedPairs: async () => new Set(["sv03.5-200|10"]),
   replaceEstimates: async (_db: unknown, rows: unknown[]) => { state.estimates = rows; return rows.length; },
@@ -39,7 +41,7 @@ const { estimatesJob } = await import("../src/jobs/estimates");
 const csv = readFileSync(new URL("../../../packages/connectors/test/fixtures/pricecharting-sample.csv", import.meta.url), "utf8");
 const ctx = { db: {} as never, log: () => {} };
 
-beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null }); process.env.PRICECHARTING_TOKEN = "t"; });
+beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null, keptPcIds: null, deletedAuto: 0, linkedForEstimates: null }); process.env.PRICECHARTING_TOKEN = "t"; });
 
 describe("pricecharting:csv", () => {
   it("imports, marks ok only after the upsert, drops stale rows, and links mapped sets", async () => {
@@ -89,8 +91,33 @@ describe("estimates", () => {
     await estimatesJob(ctx);
     expect(state.estimates).toEqual([{ product_id: "sv03.5-200", grade_value: 9, estimate_usd: 66, pct: 0.6, era: "modern", import_id: "imp1", source_as_of: at }]);
   });
+  it("ignores auto links whose PriceCharting console is no longer mapped to the card's set, but always keeps overrides", async () => {
+    const at = new Date().toISOString();
+    state.lastOk = { id: "imp1", fetched_at: at, row_count: 7 };
+    const base = { language: "en", releaseDate: "2023-09-22", salesVolume: 1, pricesUsd: { "9": 100 } };
+    state.linkedForEstimates = [
+      { ...base, productId: "sv03.5-1", setId: "sv03.5", isOverride: false, consoleName: "Pokemon Scarlet & Violet 151" },
+      { ...base, productId: "sv03.5-2", setId: "sv03.5", isOverride: false, consoleName: "Pokemon Old Console" },
+      { ...base, productId: "unmapped-3", setId: "nomap", isOverride: false, consoleName: "Pokemon Scarlet & Violet 151" },
+      { ...base, productId: "sv03.5-4", setId: "sv03.5", isOverride: true, consoleName: "Pokemon Anything" },
+    ];
+    const logs: string[] = [];
+    await estimatesJob({ db: {} as never, log: (m) => logs.push(m) });
+    expect((state.estimates as { product_id: string }[]).map((e) => e.product_id).sort()).toEqual(["sv03.5-1", "sv03.5-4"]);
+    expect(logs).toContain("skipped 2 auto links whose PriceCharting console is no longer mapped to the card's set");
+  });
   it("fails clearly when there has never been an ok import", async () => {
     await expect(estimatesJob(ctx)).rejects.toThrow("pricecharting:csv");
+  });
+});
+
+describe("linkMapped stale auto links", () => {
+  it("keeps the links of every PriceCharting row on a mapped console and logs how many others it deleted", async () => {
+    state.deletedAuto = 4;
+    const logs: string[] = [];
+    await linkMapped({} as never, (m) => logs.push(m));
+    expect(state.keptPcIds!.sort()).toEqual(["5001", "5003", "5009"]);
+    expect(logs).toContain("deleted 4 auto links for PriceCharting rows on consoles that are no longer mapped");
   });
 });
 
