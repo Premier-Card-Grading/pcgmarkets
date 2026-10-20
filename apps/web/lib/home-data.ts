@@ -9,7 +9,7 @@ export function setLine(r: Pick<RecentRow, "set_code" | "set_name_en" | "set_nam
   const head = r.set_code ?? r.set_name_en ?? r.set_name_ja ?? ""; return `${head} ${r.number_printed} · ${fmtDateShort(r.sold_at)}`;
 }
 export function toRecentSale(r: RecentRow): RecentSale {
-  return { id: r.id, productId: r.product_id, name: (r.language === "ja" ? r.name_ja ?? r.name_en : r.name_en ?? r.name_ja) ?? r.product_id, setLine: setLine(r), imageUrl: r.image_url,
+  return { id: r.id, productId: r.product_id, name: (r.name_en ?? r.name_ja) ?? r.product_id, setLine: setLine(r), imageUrl: r.image_url,
     gradeValue: Number(r.grade_value), gradeLabel: r.grade_label && r.grade_label !== "any" ? r.grade_label : null, priceUsd: r.price_usd == null ? null : Number(r.price_usd), source: sourceName(r.source), soldAt: r.sold_at };
 }
 export async function loadHome(db: SupabaseClient) {

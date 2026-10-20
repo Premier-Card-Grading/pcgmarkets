@@ -20,13 +20,13 @@ export default async function CardPage({ params, searchParams }: { params: Promi
   }
   if (!data) notFound();
   const { product, set } = data; const ja = product.language === "ja";
-  const name = (ja ? product.name_ja ?? product.name_en : product.name_en ?? product.name_ja) ?? product.id;
-  const alt = ja ? product.name_en : product.name_ja; const setName = set.name_ja ?? set.name_en ?? set.id;
+  const name = (product.name_en ?? product.name_ja) ?? product.id;
+  const alt = product.name_en ? product.name_ja : null; const setName = set.name_en ?? set.name_ja ?? set.id;
   const sub = [alt, product.rarity].filter(Boolean).join(" · ");
   return (<>
     <AppHeader variant="public" />
     <main className="mx-auto w-full max-w-[1120px] flex-1 px-5 pt-6 pb-10">
-      <div className="flex flex-wrap items-center gap-2 text-[13.5px] font-medium text-mute"><a className="font-semibold text-teal no-underline" href={`/search?q=${encodeURIComponent(set.printed_code ?? setName)}`}>{setName}</a><span>/</span><span>{ja ? "Japanese" : "English"}</span></div>
+      <div className="flex flex-wrap items-center gap-2 text-[13.5px] font-medium text-mute"><a className="font-semibold text-teal no-underline" href={`/sets/${encodeURIComponent(set.id)}`}>{setName}</a><span>/</span><span>{ja ? "Japanese" : "English"}</span></div>
       <div className="mt-2.5 flex flex-col gap-3">
         <h1 className="m-0 text-[clamp(32px,5vw,48px)] font-extrabold leading-none tracking-[-0.03em] wdth-104 text-balance">{name}{sub && <i className="mt-2 block text-[0.45em] font-semibold not-italic tracking-[-0.01em] text-mute wdth-100">{sub}</i>}</h1>
         <div className="flex flex-wrap gap-1.5"><Chip variant="number" className="!rounded-lg !px-2.5 !py-1 !text-base">{product.number_printed}</Chip>{set.printed_code && <Chip>{set.printed_code}</Chip>}<Chip variant="lang">{ja ? "Japanese" : "English"}</Chip>{set.release_date && <Chip>Released {fmtDateLong(set.release_date)}</Chip>}</div>

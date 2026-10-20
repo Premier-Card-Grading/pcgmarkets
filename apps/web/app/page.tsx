@@ -29,12 +29,12 @@ export default async function Home() {
         <section>
           <SectionHead title="Browse by set" aside="Most sales first" />
           <ul className="m-0 grid list-none grid-cols-1 gap-1.5 p-0 md:grid-cols-2">
-            {sets.map((s) => (<li key={s.id}><a href={`/search?q=${encodeURIComponent(s.printed_code ?? s.name_en ?? s.name_ja ?? "")}`} className="grid grid-cols-[1fr_auto] items-center gap-x-2.5 rounded-[10px] border border-line-2 bg-surface px-3 py-2.5 no-underline transition-colors hover:border-line">
-              <span className="text-[15px] font-bold leading-[1.25]">{s.name_ja ?? s.name_en}</span>
+            {sets.map((s) => (<li key={s.id}><a href={`/sets/${encodeURIComponent(s.id)}`} className="grid grid-cols-[1fr_auto] items-center gap-x-2.5 rounded-[10px] border border-line-2 bg-surface px-3 py-2.5 no-underline transition-colors hover:border-line">
+              <span className="text-[15px] font-bold leading-[1.25]">{s.name_en ?? s.name_ja}</span>
               {s.sale_count > 0 && <span className="col-start-2 row-span-2 rounded-full bg-sunk px-[9px] py-0.5 text-[12.5px] font-bold text-ink-2 tnum">{s.sale_count}</span>}
               <span className="text-[12.5px] text-mute">{[s.printed_code, s.language === "ja" ? "Japanese" : "English"].filter(Boolean).join(" · ")}</span>
             </a></li>))}
-            <li className="md:col-span-2"><a href="/search" className="block px-3 py-2.5 text-[13.5px] font-semibold text-teal no-underline">All {setTotal.toLocaleString("en-US")} sets →</a></li>
+            <li className="md:col-span-2"><a href="/sets" className="block px-3 py-2.5 text-[13.5px] font-semibold text-teal no-underline">All {setTotal.toLocaleString("en-US")} sets →</a></li>
           </ul>
         </section>
         <section>
