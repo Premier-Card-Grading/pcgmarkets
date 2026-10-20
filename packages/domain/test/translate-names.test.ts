@@ -17,11 +17,22 @@ describe("translateJaCardName", () => {
     expect(translateJaCardName("オーキド博士")).toBe("Professor Oak");
     expect(translateJaCardName("基本超エネルギー")).toBe("Basic Psychic Energy");
   });
+  it("uses official English spellings from the generator overrides", () => {
+    expect(translateJaCardName("ニドラン♀")).toBe("Nidoran ♀");
+    expect(translateJaCardName("ニドラン♂")).toBe("Nidoran ♂");
+    expect(translateJaCardName("カモネギ")).toBe("Farfetch'd");
+  });
   it("ignores surrounding whitespace", () => { expect(translateJaCardName(" ピカチュウ ")).toBe("Pikachu"); });
   it("returns null when any part is unknown, never a partial name", () => {
     expect(translateJaCardName("なぞのカード")).toBeNull();
     expect(translateJaCardName("ピカチュウなぞ")).toBeNull();
     expect(translateJaCardName("")).toBeNull();
     expect(translateJaCardName(null)).toBeNull();
+    expect(translateJaCardName("ロケット団のなぞ")).toBeNull();
+  });
+  it("does not match inherited object keys", () => {
+    expect(translateJaCardName("constructor")).toBeNull();
+    expect(translateJaCardName("toString")).toBeNull();
+    expect(translateJaCardName("__proto__")).toBeNull();
   });
 });
