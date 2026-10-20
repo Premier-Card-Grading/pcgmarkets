@@ -88,7 +88,7 @@ create table pc_product_links (
   pc_id          text primary key references pc_products(pc_id) on delete cascade,
   state          text not null check (state in ('linked','needs_review','rejected')),
   product_id     text references products(id),
-  review_reason  text,                       -- 'no_card_number' | 'no_match' | 'ambiguous'
+  review_reason  text,                       -- 'no_card_number' | 'variant' | 'no_match' | 'ambiguous'
   is_override    boolean not null default false,
   updated_at     timestamptz not null default now()
 );
@@ -151,6 +151,8 @@ grant select on public_price_estimates to anon, authenticated;
   The run is recorded with status `suspect` in `ingest_runs`.
 - **Link** (after an ok import), for every `pc_products` row whose `console_name` is in `pc_set_map`:
   - `card_number` null → `needs_review` / `no_card_number`.
+  - `product_name` contains a bracketed variant tag, for example `Charizard [1st Edition] #4` or `Pikachu [Reverse Holo] #58` → `needs_review` / `variant`. Our catalog has one product per card number, so only the plain listing links automatically. An admin can still link a variant on purpose.
+  - If more than one PriceCharting row ends up linked to the same product (possible only through admin overrides), the `estimates` job skips that product and logs it. It never picks one.
   - Normalise the number using the existing `card-number.ts` rules and look it up among `products` in the mapped `set_id`. Exactly one match → `linked`. None → `needs_review` / `no_match`. More than one → `needs_review` / `ambiguous`.
   - Rows with `is_override = true` are never touched.
   - The run log reports, per mapped set, how many cards were linked and how many need review. A set where **under 50%** of its rows link is called out as a probable bad mapping.
@@ -187,7 +189,7 @@ The pure function `computeEstimates(input) → Estimate[]` in `packages/domain/s
 **Job steps:**
 1. Load the latest `ok` import. If it's **older than 7 days**, the run is `suspect` and the existing estimates are left in place.
 2. Compute the estimates.
-3. Replace `price_estimates` in a single transaction.
+3. Replace `price_estimates` in a single transaction, using a SQL function `replace_price_estimates(rows jsonb)` called by RPC. supabase-js has no client-side transactions.
 4. Log the count per era, plus the cards skipped (no era, no PSA price).
 
 ## 7. Card page
@@ -196,16 +198,20 @@ The pure function `computeEstimates(input) → Estimate[]` in `packages/domain/s
 - **Which estimates show:**
   - An estimate whose `source_as_of` is **older than 14 days** is ignored.
   - An estimate for a grade that has any real PCG price point is ignored. Real prices always win, even if a stale estimate row exists.
-- **The grade cell:** a grade with an estimate and no PCG price shows **"~$84"** in a muted text style, plus an **"Est."** badge using the existing `Badge` component.
+- **The grade selector.** The card page has no grid. It has a grade selector (`GradeSelect`) and one price box (`GuideBox`) for the chosen grade.
+  - Estimated grades are added to the selector **after** the real grades. Instead of "N sales" they show **"Est."**.
+  - Choosing one shows an estimate box instead of `GuideBox`. It shows the grade badge, **"~$84"** in a muted style and an **"Est."** badge. The sales list and "Over time" chart are not rendered for an estimated grade.
+  - The default grade is always a real one when any exists. Only when a card has no real grades in the window does the page default to the highest estimated grade.
   - An estimate ignores the window selector and shows in every window, because it only exists when the grade has never sold.
-- **Footnote** under the grid, only when at least one estimate is shown: *"Estimated from PSA market prices and card popularity — no PCG sales yet."*
+- **Footnote** under the estimate box: *"Estimated from PSA market prices and card popularity — no PCG sales yet."*
 - **Never shown:** no PSA price, percentage, popularity rank or source name.
 - **Excluded from:** price charts, sparklines, the sold list, "last sold", home-page movers and strips, search results, and any `n_sales` or confidence display. Those stay real-sales only.
 
 ## 8. Admin
 
-- **Review:** `/admin/review` gets a **"PriceCharting links"** filter listing `pc_product_links` rows in `needs_review`. Each row shows the console name, product name, parsed number and reason.
-  - The admin can link a row to a product by ID (`is_override = true`) or reject it. This reuses the existing review item layout.
+- **Review:** a new page, `/admin/review/pricecharting`, linked from a "PriceCharting links (N)" chip on `/admin/review`. It lists `pc_product_links` rows in `needs_review`, showing console name, product name, parsed number and reason.
+  - The admin can link a row to a product by ID (`is_override = true`) or reject it.
+  - It's a separate page because the existing review item is built around eBay listings (photos, price, sold date).
 - **Health:** `/admin/health` shows the last `pricecharting:csv` and `estimates` runs like the other jobs, plus the latest import's age.
 - **Set mapping:** `pc_set_map` is maintained by SQL or a seed file (`packages/db/seed/pc-set-map.sql`) in v1. There is no editing UI.
 
@@ -217,7 +223,8 @@ The pure function `computeEstimates(input) → Estimate[]` in `packages/domain/s
 | Token missing or connector off | Job fails fast with a clear message, like the other connectors |
 | Latest ok import older than 7 days | `estimates` is `suspect`; existing estimates are kept |
 | Estimate source older than 14 days | Hidden on the card page |
-| Card number missing, no match, or ambiguous | `needs_review`; no estimate |
+| Card number missing, bracketed variant, no match, or ambiguous | `needs_review`; no estimate |
+| Several PriceCharting rows linked to one product | That product is skipped and logged |
 | Set mapping links under 50% of its rows | Called out in the run log as a probable bad mapping |
 | PSA price missing or zero for a grade | No estimate for that grade |
 | `(language, era)` group under 20 cards | `pct` = 0.60 floor |
@@ -240,7 +247,7 @@ The pure function `computeEstimates(input) → Estimate[]` in `packages/domain/s
   - Column mapping, empty prices, and each case in the sanity gate.
 - **DB:** a test that the anon role **cannot** select from any `pc_*` table or from `price_estimates`, and **can** select from `public_price_estimates`, which has no `pct` column.
 - **Web:**
-  - Component tests: the estimate cell renders "~$" with an "Est." badge; it never renders when a real price exists; the footnote appears only when an estimate is shown; stale estimates are hidden.
+  - Unit tests in `apps/web/test/` (the web app has no component-test setup): estimate options are built only for grades with no real price; stale estimates are dropped; the default grade prefers a real grade; tier-10 estimates map to one `10` option.
   - The Playwright card-page screenshot is updated.
 
 ## 11. Open risks
