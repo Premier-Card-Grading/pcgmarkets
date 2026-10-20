@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
   upserted: 0, deletedStale: false, links: [] as unknown[], estimates: [] as unknown[],
   failUpsert: false,
   setMap: null as null | unknown[], pcRows: null as null | unknown[], cands: null as null | unknown[],
-  keptPcIds: null as null | string[], deletedAuto: 0, linkedForEstimates: null as null | unknown[],
+  keptPcIds: null as null | string[], consoles: [] as string[], candSets: [] as string[], deletedAuto: 0, linkedForEstimates: null as null | unknown[],
 }));
 vi.mock("@pcg/db", () => ({
   lastOkImport: async () => state.lastOk,
@@ -16,14 +16,14 @@ vi.mock("@pcg/db", () => ({
   finishImport: async (_db: unknown, id: string, status: string, notes: string | null) => { const i = state.imports.find((x) => x.id === id)!; i.status = status; i.notes = notes; },
   upsertPcProducts: async (_db: unknown, _id: string, rows: unknown[]) => { if (state.failUpsert) throw new Error("db down"); state.upserted += rows.length; },
   deleteStalePcProducts: async () => { state.deletedStale = true; },
-  loadSetMap: async () => state.setMap ?? [{ setId: "sv03.5", consoleName: "Pokemon Scarlet & Violet 151", eraOverride: null }],
-  loadPcProductsForConsoles: async () => state.pcRows ?? [
+  loadSetMap: async () => state.setMap ?? [{ setId: "sv03.5", consoleName: "Pokemon Scarlet & Violet 151", eraOverride: null, language: "en" }],
+  loadPcProductsForConsoles: async (_db: unknown, consoles: string[]) => { state.consoles = consoles; return state.pcRows ?? [
     { pcId: "5001", consoleName: "Pokemon Scarlet & Violet 151", productName: "Blastoise ex #200", cardNumber: "200" },
     { pcId: "5003", consoleName: "Pokemon Scarlet & Violet 151", productName: "Blastoise ex [Reverse Holo] #9", cardNumber: "9" },
     { pcId: "5009", consoleName: "Pokemon Scarlet & Violet 151", productName: "Overridden #1", cardNumber: "1" },
-  ],
+  ]; },
   loadAllConsoleCounts: async () => new Map([["Pokemon Scarlet & Violet 151", 3], ["Pokemon Base Set", 2]]),
-  loadLinkCandidates: async () => state.cands ?? [{ id: "sv03.5-200", setId: "sv03.5", numberNum: 200, numberPrinted: "200/165" }, { id: "sv03.5-9", setId: "sv03.5", numberNum: 9, numberPrinted: "009/165" }],
+  loadLinkCandidates: async (_db: unknown, setIds: string[]) => { state.candSets = setIds; return state.cands ?? [{ id: "sv03.5-200", setId: "sv03.5", numberNum: 200, numberPrinted: "200/165" }, { id: "sv03.5-9", setId: "sv03.5", numberNum: 9, numberPrinted: "009/165" }]; },
   loadOverriddenPcIds: async () => new Set(["5009"]),
   upsertPcLinks: async (_db: unknown, rows: unknown[]) => { state.links = rows; },
   deleteUnmappedAutoLinks: async (_db: unknown, keep: string[]) => { state.keptPcIds = keep; return state.deletedAuto; },
@@ -41,7 +41,7 @@ const { estimatesJob } = await import("../src/jobs/estimates");
 const csv = readFileSync(new URL("../../../packages/connectors/test/fixtures/pricecharting-sample.csv", import.meta.url), "utf8");
 const ctx = { db: {} as never, log: () => {} };
 
-beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null, keptPcIds: null, deletedAuto: 0, linkedForEstimates: null }); process.env.PRICECHARTING_TOKEN = "t"; });
+beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null, keptPcIds: null, consoles: [], candSets: [], deletedAuto: 0, linkedForEstimates: null }); process.env.PRICECHARTING_TOKEN = "t"; });
 
 describe("pricecharting:csv", () => {
   it("imports, marks ok only after the upsert, drops stale rows, and links mapped sets", async () => {
@@ -121,10 +121,28 @@ describe("linkMapped stale auto links", () => {
   });
 });
 
+describe("linkMapped language guard", () => {
+  it("skips a Japanese console mapped to a non-Japanese set and a Japanese set mapped to a non-Japanese console", async () => {
+    state.setMap = [
+      { setId: "en1", consoleName: "Pokemon Base Set", eraOverride: null, language: "en" },
+      { setId: "en2", consoleName: "Pokemon japanese Clay Burst", eraOverride: null, language: "en" },
+      { setId: "ja1", consoleName: "Pokemon Shiny Treasure ex", eraOverride: null, language: "ja" },
+      { setId: "ja2", consoleName: "Pokemon Japanese Shiny Treasure ex", eraOverride: null, language: "ja" },
+    ];
+    state.pcRows = []; state.cands = [];
+    const logs: string[] = [];
+    await linkMapped({} as never, (m) => logs.push(m));
+    expect(state.consoles.sort()).toEqual(["Pokemon Base Set", "Pokemon Japanese Shiny Treasure ex"]);
+    expect(state.candSets.sort()).toEqual(["en1", "ja2"]);
+    expect(logs).toContain(`warning: skipping set en2 mapped to console "Pokemon japanese Clay Burst": a Japanese console on a non-Japanese set`);
+    expect(logs).toContain(`warning: skipping set ja1 mapped to console "Pokemon Shiny Treasure ex": a Japanese set on a non-Japanese console`);
+  });
+});
+
 describe("linkMapped with several sets on one console", () => {
   const C = "Pokemon Shared";
   const setup = (cands: unknown[]) => {
-    state.setMap = [{ setId: "a", consoleName: C, eraOverride: null }, { setId: "b", consoleName: C, eraOverride: null }];
+    state.setMap = [{ setId: "a", consoleName: C, eraOverride: null, language: "en" }, { setId: "b", consoleName: C, eraOverride: null, language: "en" }];
     state.pcRows = [{ pcId: "7001", consoleName: C, productName: "Card #5", cardNumber: "5" }];
     state.cands = cands;
   };

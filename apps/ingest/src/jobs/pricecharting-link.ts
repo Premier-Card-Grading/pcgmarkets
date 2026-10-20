@@ -5,7 +5,13 @@ import { loadSetMap, loadPcProductsForConsoles, loadLinkCandidates, loadOverridd
 import { linkPcProduct, type LinkCandidate } from "@pcg/domain";
 
 export async function linkMapped(db: Db, log: (m: string) => void): Promise<{ linked: number; review: number }> {
-  const map = await loadSetMap(db);
+  const map = (await loadSetMap(db)).filter((m) => {
+    // Guard against a mapping typo pairing a Japanese PriceCharting console with an English set, or the reverse.
+    const jpConsole = /japanese/i.test(m.consoleName), jpSet = m.language === "ja";
+    if (jpConsole === jpSet) return true;
+    log(`warning: skipping set ${m.setId} mapped to console "${m.consoleName}": ${jpConsole ? "a Japanese console on a non-Japanese set" : "a Japanese set on a non-Japanese console"}`);
+    return false;
+  });
   const setsByConsole = new Map<string, string[]>();
   for (const m of map) setsByConsole.set(m.consoleName, [...(setsByConsole.get(m.consoleName) ?? []), m.setId]);
   for (const [c, ids] of setsByConsole) if (ids.length > 1) log(`console "${c}" is mapped to several sets: ${ids.join(", ")}; matching against all of them`);

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Db } from "../src/client";
-import { deleteUnmappedAutoLinks, loadLinkedForEstimates } from "../src/repo/pricecharting";
+import { deleteUnmappedAutoLinks, loadLinkedForEstimates, loadSetMap } from "../src/repo/pricecharting";
 
 /** Chainable fake: every builder method is recorded; range() resolves a slice of `rows`; awaiting a delete chain resolves ok. */
 function fakeDb(rows: unknown[]) {
@@ -49,5 +49,16 @@ describe("loadLinkedForEstimates", () => {
     const sel = String(calls.find((c) => c.method === "select")!.args[0]);
     expect(sel).toContain("is_override");
     expect(sel).toContain("console_name");
+  });
+});
+
+describe("loadSetMap", () => {
+  it("embeds the set's language", async () => {
+    const { db, calls } = fakeDb([{ set_id: "s1", console_name: "Pokemon Japanese X", era_override: null, sets: { language: "ja" } }, { set_id: "s2", console_name: "Pokemon Y", era_override: "mid", sets: null }]);
+    expect(await loadSetMap(db)).toEqual([
+      { setId: "s1", consoleName: "Pokemon Japanese X", eraOverride: null, language: "ja" },
+      { setId: "s2", consoleName: "Pokemon Y", eraOverride: "mid", language: null },
+    ]);
+    expect(String(calls.find((c) => c.method === "select")!.args[0])).toContain("sets(language)");
   });
 });

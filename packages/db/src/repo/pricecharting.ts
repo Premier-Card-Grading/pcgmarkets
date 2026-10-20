@@ -28,9 +28,10 @@ export async function deleteStalePcProducts(db: Db, importId: string) {
   must(await db.from("pc_products").delete().neq("import_id", importId));
 }
 export async function loadSetMap(db: Db) {
-  const rows = await selectAll<{ set_id: string; console_name: string; era_override: Era | null }>((f, t) =>
-    db.from("pc_set_map").select("set_id,console_name,era_override").order("set_id").range(f, t));
-  return rows.map((r) => ({ setId: r.set_id, consoleName: r.console_name, eraOverride: r.era_override }));
+  type Row = { set_id: string; console_name: string; era_override: Era | null; sets: { language: "ja" | "en" } | null };
+  const rows = await selectAll<Row>((f, t) =>
+    db.from("pc_set_map").select("set_id,console_name,era_override,sets(language)").order("set_id").range(f, t) as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>);
+  return rows.map((r) => ({ setId: r.set_id, consoleName: r.console_name, eraOverride: r.era_override, language: r.sets?.language ?? null }));
 }
 export async function loadPcProductsForConsoles(db: Db, consoles: string[]) {
   if (!consoles.length) return [];
