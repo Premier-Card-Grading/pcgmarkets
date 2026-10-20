@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { EstimateBox, ESTIMATE_FOOTNOTE } from "../components/EstimateBox";
+import { GradeSelect } from "../components/GradeSelect";
 import type { GradeOption } from "../lib/grades";
 
 const opt: GradeOption = { key: "10e", gradeValue: 10, tier: null, label: "PCG 10", nSales: 0, medianUsd: 84, minUsd: 84, maxUsd: 84, confidence: "low", lastSoldAt: "", estimate: true };
@@ -13,5 +14,18 @@ describe("EstimateBox", () => {
     expect(html).toContain("Est.");
     expect(ESTIMATE_FOOTNOTE).toBe("Estimated from PSA market prices and card popularity — no PCG sales yet.");
     expect(html).toContain(ESTIMATE_FOOTNOTE);
+  });
+  it("expands Est. to 'Estimated' for assistive tech while keeping the visible text", () => {
+    const html = renderToStaticMarkup(createElement(EstimateBox, { opt }));
+    expect(html).toContain('<abbr title="Estimated"');
+    expect(html).toContain('<span aria-hidden="true">Est.</span><span class="sr-only">Estimated</span>');
+  });
+});
+
+describe("GradeSelect", () => {
+  it("expands Est. to 'Estimated' on the trigger for an estimated grade", () => {
+    const html = renderToStaticMarkup(createElement(GradeSelect, { options: [opt], value: "10e", onChange: () => {} }));
+    expect(html).toContain('<abbr title="Estimated"');
+    expect(html).toContain('<span aria-hidden="true">Est.</span><span class="sr-only">Estimated</span>');
   });
 });
