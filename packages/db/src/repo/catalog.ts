@@ -2,8 +2,8 @@ import type { Db } from "../client";
 import { must } from "../client";
 import { InMemoryCatalog, type Language, type SetRef, type ProductRef } from "@pcg/domain";
 
-export interface SetRow { id: string; printed_code: string | null; language: Language; name_en: string | null; name_ja: string | null; release_date: string | null; card_count: number | null; aliases: string[] }
-export interface ProductRow { id: string; set_id: string; number_printed: string; number_num: number | null; number_denom: number | null; number_suffix: string | null; name_en: string | null; name_ja: string | null; rarity: string | null; language: Language; image_url: string | null }
+export interface SetRow { id: string; printed_code: string | null; language: Language; name_en: string | null; name_ja: string | null; release_date: string | null; card_count: number | null; aliases: string[]; logo_url?: string | null; series?: string | null; source?: "tcgdex" | "limitless"; limitless_code?: string | null }
+export interface ProductRow { id: string; set_id: string; number_printed: string; number_num: number | null; number_denom: number | null; number_suffix: string | null; name_en: string | null; name_ja: string | null; rarity: string | null; language: Language; image_url: string | null; image_source?: "tcgdex" | "limitless" | "pokemontcg" | null }
 
 const CHUNK = 500;
 async function chunked<T>(rows: T[], fn: (c: T[]) => Promise<void>) {
