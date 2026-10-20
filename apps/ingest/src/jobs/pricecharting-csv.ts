@@ -21,6 +21,7 @@ export function pricechartingCsvJob(deps: { download: (token: string) => Promise
     await upsertPcProducts(db, importId, rows);
     await deleteStalePcProducts(db, importId);
     await finishImport(db, importId, "ok", null);
+    // note: if linkMapped fails after this point the import stays committed; re-run `pricecharting:link`
     log(`imported ${rows.length} PriceCharting rows`);
     const { linked, review } = await linkMapped(db, log);
     return { items_seen: rows.length, items_new: linked, items_updated: review };

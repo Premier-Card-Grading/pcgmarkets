@@ -7,6 +7,7 @@ const state = vi.hoisted(() => ({
   imports: [] as { id: string; status: string; notes: string | null }[],
   upserted: 0, deletedStale: false, links: [] as unknown[], estimates: [] as unknown[],
   failUpsert: false,
+  setMap: null as null | unknown[], pcRows: null as null | unknown[], cands: null as null | unknown[],
 }));
 vi.mock("@pcg/db", () => ({
   lastOkImport: async () => state.lastOk,
@@ -14,14 +15,14 @@ vi.mock("@pcg/db", () => ({
   finishImport: async (_db: unknown, id: string, status: string, notes: string | null) => { const i = state.imports.find((x) => x.id === id)!; i.status = status; i.notes = notes; },
   upsertPcProducts: async (_db: unknown, _id: string, rows: unknown[]) => { if (state.failUpsert) throw new Error("db down"); state.upserted += rows.length; },
   deleteStalePcProducts: async () => { state.deletedStale = true; },
-  loadSetMap: async () => [{ setId: "sv03.5", consoleName: "Pokemon Scarlet & Violet 151", eraOverride: null }],
-  loadPcProductsForConsoles: async () => [
+  loadSetMap: async () => state.setMap ?? [{ setId: "sv03.5", consoleName: "Pokemon Scarlet & Violet 151", eraOverride: null }],
+  loadPcProductsForConsoles: async () => state.pcRows ?? [
     { pcId: "5001", consoleName: "Pokemon Scarlet & Violet 151", productName: "Blastoise ex #200", cardNumber: "200" },
     { pcId: "5003", consoleName: "Pokemon Scarlet & Violet 151", productName: "Blastoise ex [Reverse Holo] #9", cardNumber: "9" },
     { pcId: "5009", consoleName: "Pokemon Scarlet & Violet 151", productName: "Overridden #1", cardNumber: "1" },
   ],
   loadAllConsoleCounts: async () => new Map([["Pokemon Scarlet & Violet 151", 3], ["Pokemon Base Set", 2]]),
-  loadLinkCandidates: async () => [{ id: "sv03.5-200", setId: "sv03.5", numberNum: 200, numberPrinted: "200/165" }, { id: "sv03.5-9", setId: "sv03.5", numberNum: 9, numberPrinted: "009/165" }],
+  loadLinkCandidates: async () => state.cands ?? [{ id: "sv03.5-200", setId: "sv03.5", numberNum: 200, numberPrinted: "200/165" }, { id: "sv03.5-9", setId: "sv03.5", numberNum: 9, numberPrinted: "009/165" }],
   loadOverriddenPcIds: async () => new Set(["5009"]),
   upsertPcLinks: async (_db: unknown, rows: unknown[]) => { state.links = rows; },
   loadLinkedForEstimates: async () => [
@@ -33,11 +34,12 @@ vi.mock("@pcg/db", () => ({
 }));
 
 const { pricechartingCsvJob } = await import("../src/jobs/pricecharting-csv");
+const { linkMapped } = await import("../src/jobs/pricecharting-link");
 const { estimatesJob } = await import("../src/jobs/estimates");
 const csv = readFileSync(new URL("../../../packages/connectors/test/fixtures/pricecharting-sample.csv", import.meta.url), "utf8");
 const ctx = { db: {} as never, log: () => {} };
 
-beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, links: [], estimates: [], failUpsert: false }); process.env.PRICECHARTING_TOKEN = "t"; });
+beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null }); process.env.PRICECHARTING_TOKEN = "t"; });
 
 describe("pricecharting:csv", () => {
   it("imports, marks ok only after the upsert, drops stale rows, and links mapped sets", async () => {
@@ -89,5 +91,31 @@ describe("estimates", () => {
   });
   it("fails clearly when there has never been an ok import", async () => {
     await expect(estimatesJob(ctx)).rejects.toThrow("pricecharting:csv");
+  });
+});
+
+describe("linkMapped with several sets on one console", () => {
+  const C = "Pokemon Shared";
+  const setup = (cands: unknown[]) => {
+    state.setMap = [{ setId: "a", consoleName: C, eraOverride: null }, { setId: "b", consoleName: C, eraOverride: null }];
+    state.pcRows = [{ pcId: "7001", consoleName: C, productName: "Card #5", cardNumber: "5" }];
+    state.cands = cands;
+  };
+  it("links to the only set that has the number", async () => {
+    setup([{ id: "a-5", setId: "a", numberNum: 5, numberPrinted: "5/10" }, { id: "b-6", setId: "b", numberNum: 6, numberPrinted: "6/10" }]);
+    const r = await linkMapped({} as never, () => {});
+    expect(r).toEqual({ linked: 1, review: 0 });
+    expect(state.links).toEqual([{ pc_id: "7001", state: "linked", product_id: "a-5", review_reason: null }]);
+  });
+  it("sends colliding numbers to review as ambiguous", async () => {
+    setup([{ id: "a-5", setId: "a", numberNum: 5, numberPrinted: "5/10" }, { id: "b-5", setId: "b", numberNum: 5, numberPrinted: "5/12" }]);
+    await linkMapped({} as never, () => {});
+    expect(state.links).toEqual([{ pc_id: "7001", state: "needs_review", product_id: null, review_reason: "ambiguous" }]);
+  });
+  it("logs the multi-set mapping", async () => {
+    setup([]);
+    const logs: string[] = [];
+    await linkMapped({} as never, (m) => logs.push(m));
+    expect(logs).toContain(`console "${C}" is mapped to several sets: a, b; matching against all of them`);
   });
 });
