@@ -17,6 +17,11 @@ export async function upsertProducts(db: Db, rows: ProductRow[]) {
   await chunked(rows, async (c) => { must(await db.from("products").upsert(c, { onConflict: "id" })); });
 }
 
+export async function loadLimitlessOwnedSetIds(db: Db): Promise<Set<string>> {
+  const rows = must(await db.from("sets").select("id").eq("source", "limitless")) as { id: string }[];
+  return new Set(rows.map((r) => r.id));
+}
+
 export async function loadCatalog(db: Db): Promise<InMemoryCatalog> {
   const sets = must(await db.from("sets").select("*")) as SetRow[];
   const products: ProductRow[] = [];
