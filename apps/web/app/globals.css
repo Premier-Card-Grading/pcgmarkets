@@ -49,7 +49,8 @@
 * { box-sizing: border-box; }
 html { font-variation-settings: "wdth" 100; -webkit-font-smoothing: antialiased; }
 body { margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font-sans); font-size: 15px; line-height: 1.5; }
-:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* In the base layer so a component can opt out with outline-none (e.g. a field whose wrapper draws the focus ring). */
+@layer base { :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; } }
 .wdth-112 { font-variation-settings: "wdth" 112; }
 .wdth-100 { font-variation-settings: "wdth" 100; }
 .wdth-104 { font-variation-settings: "wdth" 104; }
