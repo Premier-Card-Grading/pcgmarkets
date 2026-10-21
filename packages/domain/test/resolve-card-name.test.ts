@@ -63,7 +63,19 @@ describe("resolveCardNameEn: Limitless vs dictionary", () => {
     const out = resolveCardNameEn({ nameJa: "アズマオウ", limitlessEn: "Golking", previous: "Golking" });
     expect(out.nameEn).toBeNull();
     expect(out.note).toMatch(/Golking.*Seaking/);
-    expect(r({ nameJa: "アローラサンドパンGX", limitlessEn: "Alolan Sandslash" })).toBeNull();
+  });
+  it("R18: takes the dictionary name when it is Limitless plus a card-kind suffix (SMP-384)", () => {
+    expect(resolveCardNameEn({ nameJa: "アローラサンドパンGX", limitlessEn: "Alolan Sandslash", series: "Sun & Moon" })).toEqual({ nameEn: "Alolan Sandslash-GX", note: null });
+    expect(r({ nameJa: "リザードンEX", limitlessEn: "Charizard" })).toBe("Charizard-EX");
+    expect(r({ nameJa: "ザシアンV", limitlessEn: "Zacian", series: "Sword & Shield" })).toBe("Zacian V");
+  });
+  it("R18: a remainder that is not exactly one suffix still disagrees", () => {
+    // "Sandslash" is not a prefix of "Alolan Sandslash-GX"
+    expect(r({ nameJa: "アローラサンドパンGX", limitlessEn: "Sandslash" })).toBeNull();
+    // "-GX" is a suffix, but "Alolan Sandshrew" + "-GX" is not the dictionary name
+    expect(r({ nameJa: "アローラサンドパンGX", limitlessEn: "Alolan Sandshrew" })).toBeNull();
+    // two suffixes are not one
+    expect(r({ nameJa: "ザシアンVMAX", limitlessEn: "Zaci", series: "Sword & Shield" })).toBeNull();
   });
   it("uses whichever of the two is present", () => {
     expect(r({ nameJa: "ピカチュウ", limitlessEn: null })).toBe("Pikachu");

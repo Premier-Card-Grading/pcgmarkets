@@ -1,5 +1,5 @@
 import species from "./species-ja-en.json";
-import { CARD_NAMES, ERA_PREFIXES, ORIGINAL_ERA_SERIES, RETIRED_NAMES } from "./card-names-ja-en";
+import { CARD_NAMES, ERA_PREFIXES, ORIGINAL_ERA_SERIES, RETIRED_NAMES, SUFFIXES } from "./card-names-ja-en";
 import { normaliseJa, translateJaCardName } from "./translate";
 
 /**
@@ -48,6 +48,12 @@ function extendsByTokens(long: string, short: string): boolean {
   if (l.length <= s.length) return false;
   for (let i = 0; i + s.length <= l.length; i++) if (s.every((t, k) => l[i + k] === t)) return true;
   return false;
+}
+
+const SUFFIX_EN = new Set(SUFFIXES.map(([, en]) => en));
+/** R18: true when `long` is `short` plus exactly one card-kind suffix ("Alolan Sandslash-GX" vs "Alolan Sandslash"). */
+function extendsBySuffix(long: string, short: string): boolean {
+  return short.length > 0 && long.startsWith(short) && SUFFIX_EN.has(long.slice(short.length));
 }
 
 const isMegaType = (type: string | null | undefined) => /\bMega Evolution\b/i.test(type ?? "");
@@ -121,6 +127,8 @@ export function resolveCardNameEn(input: ResolveNameInput): ResolveNameResult {
 
   if (l && d) {
     if (l === d || extendsByTokens(l, d)) return done(l);
+    // Limitless sometimes drops the card kind (SMP-384 "Alolan Sandslash" for アローラサンドパンGX).
+    if (extendsByTokens(d, l) || extendsBySuffix(d, l)) return done(d);
     if (levenshtein(l, d) <= 2) return done(d);
     notes.push(`Limitless "${l}" disagrees with dictionary "${d}"`);
     return done(null);
