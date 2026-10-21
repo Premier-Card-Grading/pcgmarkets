@@ -11,7 +11,7 @@ export const catalogLimitless: Job = async ({ db, log }) => {
   const ours = await loadSetIds(db, "ja");
   const enIds = await loadSetIds(db, "en");
   let sets = 0, created = 0, updated = 0, skippedCards = 0;
-  let failed = 0, dupes = 0, corrected = 0, jaChanged_ = 0;
+  let failed = 0, dupes = 0, corrected = 0, jaReplaced = 0;
   for (const s of await limitless.listSets()) {
     try {
       const page = await limitless.getSet(s.code);
@@ -43,14 +43,14 @@ export const catalogLimitless: Job = async ({ db, log }) => {
         const old = byId.get(p.id);
         // R17: Limitless owns name_ja on its sets (TCGdex swapped M6-098/099). The same name up to width/spacing keeps our spelling.
         const nameJa = old?.name_ja && p.nameJa && sameJa(old.name_ja, p.nameJa) ? old.name_ja : p.nameJa ?? old?.name_ja ?? null;
-        const jaChanged = old != null && old.name_ja !== nameJa;
+        const jaChanged = old?.name_ja != null && old.name_ja !== nameJa;
         // R15: Limitless EN vs curated dictionary, against the name_ja the row will show. When name_ja changed, the stored
         // English name belonged to the wrong Japanese name, so it is not carried over.
         const previous = jaChanged ? null : old?.name_en ?? null;
         const res = resolveCardNameEn({ nameJa, limitlessEn: p.name_en, type: p.type, rarity: p.rarity, series, previous });
         const nameEn = res.nameEn;
         if (jaChanged) {
-          jaChanged_ += 1;
+          jaReplaced += 1;
           log(`${p.id}: name_ja ${JSON.stringify(old.name_ja)} -> ${JSON.stringify(nameJa)} (Limitless); name_en ${JSON.stringify(old.name_en)} -> ${JSON.stringify(nameEn)}${res.note ? `: ${res.note}` : ""}`);
         } else if (res.note) { corrected += 1; log(`${p.id} ${nameJa ?? ""}: name_en ${JSON.stringify(old?.name_en ?? null)} -> ${JSON.stringify(nameEn)}: ${res.note}`); }
         if (old) return { ...old, name_ja: nameJa, name_en: nameEn, rarity: p.rarity };
@@ -66,6 +66,6 @@ export const catalogLimitless: Job = async ({ db, log }) => {
       log(`set ${s.code}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  log(`${sets} sets, ${created} new cards, ${updated} cards updated, ${skippedCards} empty-number cards skipped, ${dupes} duplicates dropped, ${corrected} names corrected or dropped, ${jaChanged_} JA names replaced by Limitless's, ${failed} sets failed`);
+  log(`${sets} sets, ${created} new cards, ${updated} cards updated, ${skippedCards} empty-number cards skipped, ${dupes} duplicates dropped, ${corrected} names corrected or dropped, ${jaReplaced} JA names replaced by Limitless's, ${failed} sets failed`);
   return { items_seen: sets, items_new: created, items_updated: updated };
 };
