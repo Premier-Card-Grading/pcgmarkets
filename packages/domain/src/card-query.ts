@@ -16,7 +16,8 @@ export function matchesCardQuery(card: QueryableCard, q: CardQuery): boolean {
   if (q.kind === "all") return true;
   if (q.kind === "number") {
     if (card.number_num !== q.num) return false;
-    if (q.denom != null && card.number_denom !== q.denom) return false;
+    // Many JA cards (S4a, SMP, every Limitless-created row) have no stored denominator: match on the number alone.
+    if (q.denom != null && card.number_denom != null && card.number_denom !== q.denom) return false;
     if (q.suffix != null && (card.number_suffix ?? "").toUpperCase() !== q.suffix) return false;
     return true;
   }

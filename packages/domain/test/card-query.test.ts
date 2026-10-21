@@ -25,6 +25,11 @@ describe("matchesCardQuery", () => {
     expect(matchesCardQuery(pika, parseCardQuery("69/188"))).toBe(false);
     expect(matchesCardQuery(pika, parseCardQuery("70"))).toBe(false);
   });
+  it("matches a card with no stored denominator by number even when the query has one (S4a 001/190)", () => {
+    const s4a: QueryableCard = { number_printed: "001", number_num: 1, number_denom: null, number_suffix: null, name_en: "Oddish", name_ja: "ナゾノクサ" };
+    expect(matchesCardQuery(s4a, parseCardQuery("001/190"))).toBe(true);
+    expect(matchesCardQuery(s4a, parseCardQuery("002/190"))).toBe(false);
+  });
   it("matches promo suffixes", () => {
     expect(matchesCardQuery(promo, parseCardQuery("001/SV-P"))).toBe(true);
     expect(matchesCardQuery(promo, parseCardQuery("1"))).toBe(true);
