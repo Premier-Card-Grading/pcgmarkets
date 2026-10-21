@@ -71,16 +71,19 @@ Powers the `/sets` browse pages (spec: `docs/superpowers/specs/2026-10-21-sets-b
 **Run order** (each job ends with an `ok:` / `suspect:` / `failed:` line):
 
 ```bash
-pnpm ingest catalog:tcgdex      # sets + cards, EN and JA (~10 min)
-pnpm ingest catalog:limitless   # Japanese names, codes, logos, extra sets (~15 min at 1 req/s)
+pnpm ingest catalog:tcgdex      # sets + cards, EN and JA (approx. 10 min)
+pnpm ingest catalog:limitless   # Japanese names, codes, logos, extra sets (approx. 15-20 min at 1 req/s)
 pnpm ingest catalog:tcgdex      # second run must not undo Limitless-owned fields
-pnpm ingest images:ja           # Limitless small images -> WebP q80 -> Supabase storage (long)
+pnpm ingest images:ja           # Limitless small images -> WebP q80 -> Supabase storage (approx. 3 h for ~16k cards; re-runs are idempotent and skip already-copied images)
 pnpm ingest images:en           # links missing English images from pokemontcg.io
 ```
 
 - **Kill switch:** `CONNECTOR_LIMITLESS=off` disables the Limitless connector.
 - **Larger images:** once the Supabase subscription starts, run `pnpm ingest images:ja --size lg` to upgrade stored images from small to large.
-- **Permission:** Limitless gave permission on 2026-10-21 and asked for polite access: at most 1 request per second (and 2 concurrent requests to its image CDN), using the `PCGMarketsBot/0.1` user agent. A 403/429 pauses the job.
+- **Permission:** Limitless gave permission on 2026-10-21 and asked for polite access: at most 1 request per second (and 2 concurrent requests to its image CDN), using the `PCGMarketsBot/0.1` user agent. `catalog:limitless` pauses on 403/429; `images:ja` treats an image-host 403 as a missing object and pauses only on 429 or a probe-confirmed block.
+- **Names:** `name_en` = Limitless English-page name, else the curated dictionary (`translateJaCardName`), else the previous value; never overwritten with null, never machine-translated. Limitless's English page only lists cards the English game printed under that name (mostly Trainers), so older Pokémon rows rely on the dictionary.
+- **Ops note:** if `npx supabase db query --linked` fails with `DbConfigIpv6Error`, re-run `npx supabase link --project-ref mfcycnjubljszmizgzui`.
+- **Open item:** `images:en` left 938 English cards without images because pokemontcg.io returned 500/502 for those sets; re-run `pnpm ingest images:en` later.
 - **Images:** Limitless images are copied into our storage and never hotlinked; TCGdex and pokemontcg.io images are linked directly.
 - **Duplicate sets:** TCGdex returns empty duplicates `SM1+`, `sm2+`, `SM3+`, `SM4+`, `SM5+` (the real sets are `SM1p`..`SM5p`); delete them when they have no products.
 
