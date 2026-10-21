@@ -13,6 +13,9 @@
 export const PRINTED_TOTALS: Readonly<Record<string, number | string | null>> = {
   // English: Black Star promos print no total.
   "svp": null,
+  // Japanese original era and Neo (1996–2001): the cards print no number at all; the catalogue's order is ours.
+  "PMCG1": null, "PMCG2": null, "PMCG3": null, "PMCG4": null, "PMCG5": null, "PMCG6": null,
+  "ja-neo1": null, "ja-neo2": null, "ja-neo3": null, "ja-neo4": null,
   // Japanese 2010+, read from the cards.
   "20th": 72,
   "BGS": 20,
