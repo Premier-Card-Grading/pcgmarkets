@@ -14,3 +14,4 @@ export * from "./card-query";
 export * from "./names/translate";
 export * from "./limitless-merge";
 export * from "./names/resolve";
+export * from "./printed-totals";

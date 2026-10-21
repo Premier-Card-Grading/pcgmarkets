@@ -46,6 +46,25 @@ describe("numberFromCatalog", () => {
     expect(numberFromCatalog("001", { id: "SV-P", cardCountOfficial: null }))
       .toEqual({ num: 1, denom: null, suffix: "SV-P", printed: "001/SV-P" });
   });
+  it("uses the total printed on the cards over the catalogue count (SV11B prints /086, TCGdex says 174)", () => {
+    expect(numberFromCatalog("069", { id: "SV11B", cardCountOfficial: 174 }))
+      .toEqual({ num: 69, denom: 86, suffix: null, printed: "069/086" });
+    expect(numberFromCatalog("174", { id: "SV11B", cardCountOfficial: 174 })!.printed).toBe("174/086");
+    expect(numberFromCatalog("001", { id: "SM7a", cardCountOfficial: 50 })!.denom).toBe(60);
+  });
+  it("fills the printed total when the catalogue has no count (Limitless sets)", () => {
+    expect(numberFromCatalog("001", { id: "S4a", cardCountOfficial: null }))
+      .toEqual({ num: 1, denom: 190, suffix: null, printed: "001/190" });
+  });
+  it("prints the promo code for promo sets whose id has no hyphen", () => {
+    expect(numberFromCatalog("012", { id: "SMP", cardCountOfficial: null }))
+      .toEqual({ num: 12, denom: null, suffix: "SM-P", printed: "012/SM-P" });
+    expect(numberFromCatalog("005", { id: "SP", cardCountOfficial: null })!.printed).toBe("005/S-P");
+  });
+  it("prints no total for sets whose cards have none", () => {
+    expect(numberFromCatalog("001", { id: "svp", cardCountOfficial: 225 }))
+      .toEqual({ num: 1, denom: null, suffix: null, printed: "001" });
+  });
   it("returns null for non-numeric localIds (vintage JP)", () => {
     expect(numberFromCatalog("Charizard", { id: "base1", cardCountOfficial: 102 })).toBeNull();
   });

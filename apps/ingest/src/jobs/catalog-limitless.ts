@@ -53,9 +53,13 @@ export const catalogLimitless: Job = async ({ db, log }) => {
           jaReplaced += 1;
           log(`${p.id}: name_ja ${JSON.stringify(old.name_ja)} -> ${JSON.stringify(nameJa)} (Limitless); name_en ${JSON.stringify(old.name_en)} -> ${JSON.stringify(nameEn)}${res.note ? `: ${res.note}` : ""}`);
         } else if (res.note) { corrected += 1; log(`${p.id} ${nameJa ?? ""}: name_en ${JSON.stringify(old?.name_en ?? null)} -> ${JSON.stringify(nameEn)}: ${res.note}`); }
-        if (old) return { ...old, name_ja: nameJa, name_en: nameEn, rarity: p.rarity };
+        // Limitless owns the card list, so it owns numbering too; the printed total comes from PRINTED_TOTALS.
         const n = numberFromCatalog(/^\d{1,3}$/.test(p.number) ? p.number.padStart(3, "0") : p.number, { id: setId, cardCountOfficial: null });
-        return { id: p.id, set_id: setId, number_printed: n?.printed ?? p.number, number_num: n?.num ?? null, number_denom: null, number_suffix: n?.suffix ?? null,
+        const number = n
+          ? { number_printed: n.printed, number_num: n.num, number_denom: n.denom, number_suffix: n.suffix }
+          : { number_printed: old?.number_printed ?? p.number, number_num: old?.number_num ?? null, number_denom: old?.number_denom ?? null, number_suffix: old?.number_suffix ?? null };
+        if (old) return { ...old, ...number, name_ja: nameJa, name_en: nameEn, rarity: p.rarity };
+        return { id: p.id, set_id: setId, ...number,
           name_en: nameEn, name_ja: p.nameJa, rarity: p.rarity, language: "ja", image_url: null, image_source: null };
       }));
       sets += 1; created += patches.filter((p) => !byId.has(p.id)).length; updated += patches.filter((p) => byId.has(p.id)).length;

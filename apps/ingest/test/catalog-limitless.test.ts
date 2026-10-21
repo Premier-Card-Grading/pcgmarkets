@@ -70,6 +70,11 @@ describe("catalog:limitless", () => {
     expect(logs.filter((l) => /^M6-09[89]: name_ja "/.test(l))).toHaveLength(2);
     expect(logs.some((l) => l.startsWith("M6-012"))).toBe(false);
     expect(logs.filter((l) => /^(XY2-055|M6-098|M6-099) /.test(l))).toHaveLength(1);
+    // numbers carry the total printed on the cards, on new rows and on rows that already existed
+    expect(m6.get("M6-012")).toMatchObject({ number_printed: "012/076", number_num: 12, number_denom: 76, number_suffix: null });
+    expect(m6.get("M6-098")).toMatchObject({ number_printed: "098/076", number_denom: 76 });
+    expect(prods.find((r) => r[0]!.set_id === "XY2")![0]).toMatchObject({ number_printed: "055/080", number_denom: 80 });
+    expect(c[0]).toMatchObject({ number_printed: "001/021", number_num: 1, number_denom: 21 });
     expect(logs.some((l) => l.startsWith("set B: boom"))).toBe(true);
     expect(logs.at(-1)).toContain("1 sets failed");
   });

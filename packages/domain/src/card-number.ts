@@ -1,3 +1,5 @@
+import { PRINTED_TOTALS } from "./printed-totals";
+
 export interface ParsedNumber {
   num: number;
   denom: number | null;
@@ -40,11 +42,13 @@ export function numberFromCatalog(
 ): ParsedNumber | null {
   if (!/^\d{1,3}$/.test(localId)) return null;
   const num = parseInt(localId, 10);
-  if (PROMO_SET_RE.test(set.id)) {
+  const printedTotal = Object.hasOwn(PRINTED_TOTALS, set.id) ? PRINTED_TOTALS[set.id]! : undefined;
+  if (typeof printedTotal === "string") return { num, denom: null, suffix: printedTotal, printed: `${localId}/${printedTotal}` };
+  if (printedTotal === undefined && PROMO_SET_RE.test(set.id)) {
     const suffix = set.id.toUpperCase();
     return { num, denom: null, suffix, printed: `${localId}/${suffix}` };
   }
-  if (set.cardCountOfficial == null) return { num, denom: null, suffix: null, printed: localId };
-  const denom = set.cardCountOfficial;
+  const denom = printedTotal === undefined ? set.cardCountOfficial : printedTotal;
+  if (denom == null) return { num, denom: null, suffix: null, printed: localId };
   return { num, denom, suffix: null, printed: `${localId}/${String(denom).padStart(localId.length, "0")}` };
 }
