@@ -29,7 +29,7 @@ export default async function CardPage({ params, searchParams }: { params: Promi
       <div className="flex flex-wrap items-center gap-2 text-[13.5px] font-medium text-mute"><a className="font-semibold text-teal no-underline" href={`/sets/${encodeURIComponent(set.id)}`}>{setName}</a><span>/</span><span>{ja ? "Japanese" : "English"}</span></div>
       <div className="mt-2.5 flex flex-col gap-3">
         <h1 className="m-0 text-[clamp(32px,5vw,48px)] font-extrabold leading-none tracking-[-0.03em] wdth-104 text-balance">{name}{sub && <i className="mt-2 block text-[0.45em] font-semibold not-italic tracking-[-0.01em] text-mute wdth-100">{sub}</i>}</h1>
-        <div className="flex flex-wrap gap-1.5"><Chip variant="number" className="!rounded-lg !px-2.5 !py-1 !text-base">{product.number_printed}</Chip>{set.printed_code && <Chip>{set.printed_code}</Chip>}<Chip variant="lang">{ja ? "Japanese" : "English"}</Chip>{set.release_date && <Chip>Released {fmtDateLong(set.release_date)}</Chip>}</div>
+        <div className="flex flex-wrap gap-1.5">{product.number_printed && <Chip variant="number" className="!rounded-lg !px-2.5 !py-1 !text-base">{product.number_printed}</Chip>}{set.printed_code && <Chip>{set.printed_code}</Chip>}<Chip variant="lang">{ja ? "Japanese" : "English"}</Chip>{set.release_date && <Chip>Released {fmtDateLong(set.release_date)}</Chip>}</div>
         {cert && <div className="inline-flex items-center gap-2 self-start rounded-full bg-teal-soft py-1.5 pl-2.5 pr-3 text-sm font-semibold text-teal"><Check size={16} strokeWidth={2.4} />Cert {cert} is this card{cg ? `, graded PCG ${cg}${ct ? ` ${ct}` : ""}` : ""}</div>}
       </div>
       <div className="mt-[26px] grid grid-cols-1 gap-7 md:grid-cols-[250px_minmax(0,1fr)] md:gap-12">

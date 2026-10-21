@@ -45,6 +45,12 @@ export async function loadSetRow(db: Db, id: string): Promise<SetRow | null> {
   return must(await db.from("sets").select("id,printed_code,language,name_en,name_ja,release_date,card_count,aliases,logo_url,series,source,limitless_code").eq("id", id).maybeSingle()) as SetRow | null;
 }
 
+/** Limitless's own card label, kept in our id ("SV11B-001" -> "1", "HS-1a" -> "1a", "BGS-NAN1" -> "NAN1"); its image URLs use it. */
+export function limitlessLabel(productId: string, setId: string): string {
+  const label = productId.slice(setId.length + 1);
+  return /^\d+$/.test(label) ? String(parseInt(label, 10)) : label;
+}
+
 export async function loadJaImageWork(db: Db, opts: { replaceLimitless: boolean }) {
   const sets = await selectAll<{ id: string; printed_code: string | null; limitless_code: string | null; logo_url: string | null; source: string }>((f, t) =>
     db.from("sets").select("id,printed_code,limitless_code,logo_url,source").eq("language", "ja").order("id").range(f, t));
@@ -55,7 +61,7 @@ export async function loadJaImageWork(db: Db, opts: { replaceLimitless: boolean 
     const rows = await selectAll<{ id: string; number_num: number | null; number_printed: string; image_url: string | null; image_source: string | null }>((f, t) =>
       db.from("products").select("id,number_num,number_printed,image_url,image_source").eq("set_id", s.id).order("id").range(f, t));
     for (const p of rows) if (p.image_url == null || (opts.replaceLimitless && p.image_source === "limitless"))
-      cards.push({ id: p.id, set_id: s.id, code: code(s), number: p.number_num != null ? String(p.number_num) : p.number_printed });
+      cards.push({ id: p.id, set_id: s.id, code: code(s), number: limitlessLabel(p.id, s.id) });
   }
   return { sets: sets.filter((s) => s.logo_url == null).map((s) => ({ id: s.id, code: code(s) })), cards };
 }

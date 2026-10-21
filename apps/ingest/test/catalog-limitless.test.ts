@@ -7,7 +7,8 @@ vi.mock("@pcg/connectors", async (orig) => {
     A: { code: "A", nameJa: null, nameEn: null, releaseDate: null, cards: [card("1"), card("1"), card("")] },
     C: { code: "C", nameJa: null, nameEn: null, releaseDate: null, cards: [
       { ...card("1", null), nameJa: "キャタピー" }, { ...card("2", null), nameJa: "なぞ" }, { ...card("3", "Limitless Name"), nameJa: "なぞ3" }, { ...card("4", null), nameJa: "なぞ" }] },
-    XY2: { code: "XY2", nameJa: null, nameEn: null, releaseDate: null, cards: [{ ...card("55", null), nameJa: "リザードンEX", type: "N Mega Evolution", rarity: "Double Rare" }] },
+    XY2: { code: "XY2", nameJa: null, nameEn: null, releaseDate: null, cards: [{ ...card("55", null), nameJa: "リザードンEX", type: "N Mega Evolution", rarity: "Double Rare" },
+      { ...card("55a", null), nameJa: "リザードンEX", type: "N Mega Evolution", rarity: "Double Rare" }, { ...card("NAN3", "Basic Fire Energy"), nameJa: "基本炎エネルギー" }] },
     M6: { code: "M6", nameJa: null, nameEn: null, releaseDate: null, cards: [
       { ...card("98", "Pokemon Catcher"), nameJa: "ポケモンキャッチャー" }, { ...card("99", "Special Vest"), nameJa: "とくちゅうチョッキ" },
       { ...card("10", null), nameJa: "ロケット団のミュウツーex" }, { ...card("11", "Zacian-V"), nameJa: "ザシアンV" },
@@ -59,7 +60,7 @@ describe("catalog:limitless", () => {
     expect(c.map((p) => [p.id, p.name_en])).toEqual([["SVC-001", "Caterpie"], ["SVC-002", "Kept Name"], ["SVC-003", "Limitless Name"], ["SVC-004", null]]);
     const named = (set: string) => prods.find((r) => r[0]!.set_id === set)!.map((p) => [p.id, p.name_en]);
     // XY2-055 is a Mega Evolution: Limitless drops the M from リザードンEX
-    expect(named("XY2")).toEqual([["XY2-055", "M Charizard-EX"]]);
+    expect(named("XY2")).toEqual([["XY2-055", "M Charizard-EX"], ["XY2-55a", "M Charizard-EX"], ["XY2-NAN3", "Basic Fire Energy"]]);
     // R17: Limitless owns name_ja on its sets. M6-098/099 had TCGdex's swapped name_ja; Limitless's replaces it, the stored
     // English name (which belonged to the wrong Japanese name) is not trusted, and both changes are logged.
     const m6 = new Map(prods.find((r) => r[0]!.set_id === "M6")!.map((p) => [p.id, p]));
@@ -76,6 +77,9 @@ describe("catalog:limitless", () => {
     expect(m6.get("M6-098")).toMatchObject({ number_printed: "098/076", number_denom: 76 });
     const xy = prods.filter((r) => r[0]!.set_id === "XY2").flat();
     expect(xy.find((p) => p.id === "XY2-055")).toMatchObject({ number_printed: "055/080", number_denom: 80 });
+    // Limitless's own labels are not printed numbers: "55a" is a variant print of 055/080, "NAN3" a basic energy with none
+    expect(xy.find((p) => p.id === "XY2-55a")).toMatchObject({ number_printed: "055/080", number_num: 55, number_denom: 80 });
+    expect(xy.find((p) => p.id === "XY2-NAN3")).toMatchObject({ number_printed: "", number_num: null, number_denom: null });
     // a TCGdex-only card Limitless doesn't list keeps its row but gets the printed total too
     expect(xy.find((p) => p.id === "XY2-090")).toMatchObject({ number_printed: "090/080", number_denom: 80, name_en: "Old secret" });
     expect(c[0]).toMatchObject({ number_printed: "001/021", number_num: 1, number_denom: 21 });

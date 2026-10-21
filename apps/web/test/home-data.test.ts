@@ -7,4 +7,5 @@ describe("home-data", () => {
   });
   it("names sources", () => { expect(sourceName("yahoo_auc")).toBe("Yahoo!"); expect(sourceName("thecardapi")).toBe("eBay"); });
   it("falls back to set name when there is no code", () => { expect(setLine({ set_code: null, set_name_en: "Paldean Fates", set_name_ja: null, number_printed: "006/091", sold_at: "2026-09-16T00:00:00Z" })).toBe("Paldean Fates 006/091 · 16 Sept"); });
+  it("leaves out the number when the card prints none (basic energy)", () => { expect(setLine({ set_code: "BGS", set_name_en: null, set_name_ja: null, number_printed: "", sold_at: "2026-09-16T00:00:00Z" })).toBe("BGS · 16 Sept"); });
 });

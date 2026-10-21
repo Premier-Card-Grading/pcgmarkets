@@ -6,7 +6,7 @@ export interface SetRow { id: string; name_en: string | null; name_ja: string | 
 const SOURCES: Record<string, string> = { thecardapi: "eBay", soldcomps: "eBay", yahoo_auc: "Yahoo!" };
 export const sourceName = (s: string) => SOURCES[s] ?? s;
 export function setLine(r: Pick<RecentRow, "set_code" | "set_name_en" | "set_name_ja" | "number_printed" | "sold_at">) {
-  const head = r.set_code ?? r.set_name_en ?? r.set_name_ja ?? ""; return `${head} ${r.number_printed} · ${fmtDateShort(r.sold_at)}`;
+  const head = r.set_code ?? r.set_name_en ?? r.set_name_ja ?? ""; return `${[head, r.number_printed].filter(Boolean).join(" ")} · ${fmtDateShort(r.sold_at)}`;
 }
 export function toRecentSale(r: RecentRow): RecentSale {
   return { id: r.id, productId: r.product_id, name: (r.name_en ?? r.name_ja) ?? r.product_id, setLine: setLine(r), imageUrl: r.image_url,

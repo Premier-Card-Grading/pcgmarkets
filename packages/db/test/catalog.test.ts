@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Db } from "../src/client";
-import { loadCatalog } from "../src/repo/catalog";
+import { loadCatalog, limitlessLabel } from "../src/repo/catalog";
 
 /** Chainable fake per table: records builder calls; range() resolves a slice of that table's rows; awaiting without range() resolves everything. */
 function fakeDb(tables: Record<string, unknown[]>) {
@@ -28,5 +28,14 @@ describe("loadCatalog", () => {
       expect(calls.filter((c) => c.table === t && c.method === "order").map((c) => c.args[0])).toContain("id");
       expect(calls.filter((c) => c.table === t && c.method === "range").length).toBeGreaterThan(1);
     }
+  });
+});
+
+describe("limitlessLabel", () => {
+  it("recovers Limitless's card label from our id, which image URLs use", () => {
+    expect(limitlessLabel("SV11B-001", "SV11B")).toBe("1");
+    expect(limitlessLabel("HS-1a", "HS")).toBe("1a");
+    expect(limitlessLabel("BGS-NAN1", "BGS")).toBe("NAN1");
+    expect(limitlessLabel("ja-SV1-012", "ja-SV1")).toBe("12");
   });
 });
