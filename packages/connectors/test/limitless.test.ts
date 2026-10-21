@@ -36,6 +36,17 @@ describe("limitless set list", () => {
   });
 });
 
+describe("limitless older sets (XY2)", () => {
+  // Limitless only translates cards the English game printed under the same name (Trainers); Pokemon rows are absent from the EN page.
+  const page = mergeSetPages("XY2", parseSetList(fx("limitless-set-XY2-ja.html")), parseSetList(fx("limitless-set-XY2-en.html")));
+  it("joins the few English rows by number and leaves the rest null", () => {
+    expect(page.cards).toHaveLength(87);
+    expect(page.cards.find((c) => c.number === "73")).toMatchObject({ nameEn: "Sacred Ash" });
+    expect(page.cards.find((c) => c.number === "1")).toMatchObject({ nameJa: "キャタピー", nameEn: null });
+    expect(page.cards.filter((c) => c.nameEn != null)).toHaveLength(5);
+  });
+});
+
 describe("limitless helpers", () => {
   it("parses both date styles", () => {
     expect(parseLimitlessDate("16 Sep 26")).toBe("2026-09-16");

@@ -1,6 +1,6 @@
 import type { Job } from "../run";
 import { limitless, PausedError } from "@pcg/connectors";
-import { mergeLimitlessCards, numberFromCatalog } from "@pcg/domain";
+import { mergeLimitlessCards, numberFromCatalog, translateJaCardName } from "@pcg/domain";
 import { upsertSets, upsertProducts, loadSetProducts, loadSetIds, loadSetRow, type ProductRow } from "@pcg/db";
 
 /** Japanese 2010+: Limitless owns names, rarity and card lists; TCGdex keeps ids and Japanese names. */
@@ -37,10 +37,12 @@ export const catalogLimitless: Job = async ({ db, log }) => {
       // Whole rows only: an upsert with missing NOT NULL columns fails even when the row exists.
       await upsertProducts(db, patches.map((p): ProductRow => {
         const old = byId.get(p.id);
-        if (old) return { ...old, name_en: p.name_en, rarity: p.rarity };
+        // R14: Limitless EN name, else the curated dictionary, else what we already had; never null over a name.
+        const nameEn = p.name_en ?? translateJaCardName(p.nameJa ?? old?.name_ja ?? null) ?? old?.name_en ?? null;
+        if (old) return { ...old, name_en: nameEn, rarity: p.rarity };
         const n = numberFromCatalog(/^\d{1,3}$/.test(p.number) ? p.number.padStart(3, "0") : p.number, { id: setId, cardCountOfficial: null });
         return { id: p.id, set_id: setId, number_printed: n?.printed ?? p.number, number_num: n?.num ?? null, number_denom: null, number_suffix: n?.suffix ?? null,
-          name_en: p.name_en, name_ja: p.nameJa, rarity: p.rarity, language: "ja", image_url: null, image_source: null };
+          name_en: nameEn, name_ja: p.nameJa, rarity: p.rarity, language: "ja", image_url: null, image_source: null };
       }));
       sets += 1; created += patches.filter((p) => !byId.has(p.id)).length; updated += patches.filter((p) => byId.has(p.id)).length;
       if (!existingId) ours.add(setId);
