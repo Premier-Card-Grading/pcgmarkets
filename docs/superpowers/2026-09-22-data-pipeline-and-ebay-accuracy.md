@@ -61,3 +61,30 @@ Residual caveat: eBay's facet is only as good as sellers' tags — a few "PCG 10
 
 - `main`: UI redesign merged and pushed to `git@github.com:shuiiz/pcgmarkets.git`.
 - `feat/ebay-pcg-facet`: connector accuracy fix + this doc. Not merged, not pushed.
+
+## Sets catalogue (Limitless + TCGdex + pokemontcg.io)
+
+Powers the `/sets` browse pages (spec: `docs/superpowers/specs/2026-10-21-sets-browse-design.md`).
+
+**Prerequisite:** migration `packages/db/migrations/0006_sets_browse.sql` applied by hand: `npx supabase db query --linked -f packages/db/migrations/0006_sets_browse.sql`.
+
+**Run order** (each job ends with an `ok:` / `suspect:` / `failed:` line):
+
+```bash
+pnpm ingest catalog:tcgdex      # sets + cards, EN and JA (~10 min)
+pnpm ingest catalog:limitless   # Japanese names, codes, logos, extra sets (~15 min at 1 req/s)
+pnpm ingest catalog:tcgdex      # second run must not undo Limitless-owned fields
+pnpm ingest images:ja           # Limitless small images -> WebP q80 -> Supabase storage (long)
+pnpm ingest images:en           # links missing English images from pokemontcg.io
+```
+
+- **Kill switch:** `CONNECTOR_LIMITLESS=off` disables the Limitless connector.
+- **Larger images:** once the Supabase subscription starts, run `pnpm ingest images:ja --size lg` to upgrade stored images from small to large.
+- **Permission:** Limitless gave permission on 2026-10-21 and asked for polite access: at most 1 request per second (and 2 concurrent requests to its image CDN), using the `PCGMarketsBot/0.1` user agent. A 403/429 pauses the job.
+- **Images:** Limitless images are copied into our storage and never hotlinked; TCGdex and pokemontcg.io images are linked directly.
+- **Duplicate sets:** TCGdex returns empty duplicates `SM1+`, `sm2+`, `SM3+`, `SM4+`, `SM5+` (the real sets are `SM1p`..`SM5p`); delete them when they have no products.
+
+**Known gaps (spec section 7):**
+- About 2,600 pre-2010 Japanese cards have no licensed image source, so they keep the slab tile.
+- Some English sets have no image source: the DP to SM trainer kits and a few 2025-26 special sets.
+- Japanese sets that only Limitless has show numbers without the official count.
