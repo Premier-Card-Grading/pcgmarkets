@@ -12,6 +12,13 @@ function Toggle<T extends string>({ value, options, onChange, label }: { value: 
   </div>);
 }
 
+/** What to say when the grid is empty: a search that found nothing, or the "With sales" filter on a set with no sales. */
+export function emptyGridMessage(q: string, only: "all" | "sales"): string {
+  const t = q.trim();
+  if (t) return `No cards match “${t}”.`;
+  return only === "sales" ? "No cards with sales yet." : "No cards in this set yet.";
+}
+
 export function SetCardGrid({ cards, setCode, now }: { cards: SetCard[]; setCode: string | null; now: string }) {
   const [q, setQ] = useState(""); const [only, setOnly] = useState<"all" | "sales">("all"); const [by, setBy] = useState<"number" | "price">("number");
   const nowD = useMemo(() => new Date(now), [now]);
@@ -30,7 +37,7 @@ export function SetCardGrid({ cards, setCode, now }: { cards: SetCard[]; setCode
       <Toggle label="Sort" value={by} onChange={setBy} options={[{ value: "number", label: "Number" }, { value: "price", label: "Price" }]} />
     </div>
     {shown.length === 0
-      ? <p className="text-[14px] text-mute">No cards match “{q}”. <button type="button" onClick={() => { setQ(""); setOnly("all"); }} className="font-semibold text-teal">Clear</button></p>
+      ? <p className="text-[14px] text-mute">{emptyGridMessage(q, only)} <button type="button" onClick={() => { setQ(""); setOnly("all"); }} className="font-semibold text-teal">Clear</button></p>
       : <ul className="m-0 grid list-none grid-cols-2 gap-3 p-0 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{shown.map((c) => <li key={c.id}><CardTile card={c} price={tilePrice(c, nowD)} setCode={setCode} /></li>)}</ul>}
   </>);
 }
