@@ -28,7 +28,8 @@ const existingRows = [
   { id: "SVC-002", set_id: "SVC", number_printed: "002", number_num: 2, number_denom: null, number_suffix: null, name_en: "Kept Name", name_ja: "なぞ", rarity: null, language: "ja", image_url: null, image_source: null },
   { id: "SVC-004", set_id: "SVC", number_printed: "004", number_num: 4, number_denom: null, number_suffix: null, name_en: null, name_ja: "なぞ", rarity: null, language: "ja", image_url: null, image_source: null },
 ];
-const xyRows = [{ id: "XY2-055", set_id: "XY2", number_printed: "055", number_num: 55, number_denom: null, number_suffix: null, name_en: "Charizard-EX", name_ja: "リザードンEX", rarity: null, language: "ja", image_url: null, image_source: null }];
+const xyRows = [{ id: "XY2-090", set_id: "XY2", number_printed: "090/088", number_num: 90, number_denom: 88, number_suffix: null, name_en: "Old secret", name_ja: "ひみつ", rarity: null, language: "ja", image_url: null, image_source: null },
+  { id: "XY2-055", set_id: "XY2", number_printed: "055", number_num: 55, number_denom: null, number_suffix: null, name_en: "Charizard-EX", name_ja: "リザードンEX", rarity: null, language: "ja", image_url: null, image_source: null }];
 const m6Rows = [
   { id: "M6-098", set_id: "M6", number_printed: "098", number_num: 98, number_denom: null, number_suffix: null, name_en: "Pokemon Catcher", name_ja: "とくちゅうチョッキ", rarity: null, language: "ja", image_url: null, image_source: null },
   { id: "M6-099", set_id: "M6", number_printed: "099", number_num: 99, number_denom: null, number_suffix: null, name_en: "Special Vest", name_ja: "ポケモンキャッチャー", rarity: null, language: "ja", image_url: null, image_source: null },
@@ -73,7 +74,10 @@ describe("catalog:limitless", () => {
     // numbers carry the total printed on the cards, on new rows and on rows that already existed
     expect(m6.get("M6-012")).toMatchObject({ number_printed: "012/076", number_num: 12, number_denom: 76, number_suffix: null });
     expect(m6.get("M6-098")).toMatchObject({ number_printed: "098/076", number_denom: 76 });
-    expect(prods.find((r) => r[0]!.set_id === "XY2")![0]).toMatchObject({ number_printed: "055/080", number_denom: 80 });
+    const xy = prods.filter((r) => r[0]!.set_id === "XY2").flat();
+    expect(xy.find((p) => p.id === "XY2-055")).toMatchObject({ number_printed: "055/080", number_denom: 80 });
+    // a TCGdex-only card Limitless doesn't list keeps its row but gets the printed total too
+    expect(xy.find((p) => p.id === "XY2-090")).toMatchObject({ number_printed: "090/080", number_denom: 80, name_en: "Old secret" });
     expect(c[0]).toMatchObject({ number_printed: "001/021", number_num: 1, number_denom: 21 });
     expect(logs.some((l) => l.startsWith("set B: boom"))).toBe(true);
     expect(logs.at(-1)).toContain("1 sets failed");

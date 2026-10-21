@@ -79,7 +79,7 @@ export function supplementSetRow(s: JaSupplementSet): SetRow {
 export function toProductRows(lang: Language, set: TcgdexSet, setId = set.id): ProductRow[] {
   const official = set.cardCount?.official && set.cardCount.official > 0 ? set.cardCount.official : null;
   return set.cards.map((c) => {
-    const n = numberFromCatalog(c.localId, { id: set.id, cardCountOfficial: official });
+    const n = numberFromCatalog(c.localId, { id: setId, cardCountOfficial: official });
     return {
       id: setId === set.id ? c.id : `${setId}-${c.localId}`, set_id: setId,
       number_printed: n?.printed ?? c.localId, number_num: n?.num ?? null, number_denom: n?.denom ?? null, number_suffix: n?.suffix ?? null,

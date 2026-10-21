@@ -62,6 +62,14 @@ export const catalogLimitless: Job = async ({ db, log }) => {
         return { id: p.id, set_id: setId, ...number,
           name_en: nameEn, name_ja: p.nameJa, rarity: p.rarity, language: "ja", image_url: null, image_source: null };
       }));
+      // Cards TCGdex lists but Limitless doesn't (mostly the highest secret rares) keep their rows; their total still
+      // has to be the one printed on the set's cards, not TCGdex's count.
+      const renumbered = existing.filter((r) => !seen.has(r.id) && r.number_num != null).flatMap((r): ProductRow[] => {
+        const n = numberFromCatalog(String(r.number_num).padStart(3, "0"), { id: setId, cardCountOfficial: r.number_denom });
+        if (!n || (n.printed === r.number_printed && n.denom === r.number_denom && n.suffix === r.number_suffix)) return [];
+        return [{ ...r, number_printed: n.printed, number_denom: n.denom, number_suffix: n.suffix }];
+      });
+      if (renumbered.length) { await upsertProducts(db, renumbered); log(`${s.code}: renumbered ${renumbered.length} card(s) Limitless doesn't list`); }
       sets += 1; created += patches.filter((p) => !byId.has(p.id)).length; updated += patches.filter((p) => byId.has(p.id)).length;
       if (!existingId) ours.add(setId);
     } catch (e) {

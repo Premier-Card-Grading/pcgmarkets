@@ -21,6 +21,10 @@ describe("tcgdex mapping", () => {
     const promo: TcgdexSet = { id: "SV-P", name: "SVプロモ", releaseDate: null, cardCount: { total: 10, official: 0 }, cards: [{ id: "SV-P-001", localId: "001", name: "x", image: "https://assets.tcgdex.net/ja/SV/SV-P/001" }] };
     expect(toProductRows("ja", promo)[0]).toMatchObject({ number_printed: "001/SV-P", number_denom: null, number_suffix: "SV-P" });
   });
+  it("looks up the printed total by our set id, not TCGdex's (ja-neo1 cards print no number)", () => {
+    const neo: TcgdexSet = { id: "neo1", name: "金、銀、新世界へ…", releaseDate: null, cardCount: { total: 96, official: 96 }, cards: [{ id: "neo1-1", localId: "1", name: "x" }] };
+    expect(toProductRows("ja", neo, "ja-neo1")[0]).toMatchObject({ id: "ja-neo1-1", number_printed: "1", number_num: 1, number_denom: null });
+  });
   it("keeps non-numeric localIds as products with null number_num", () => {
     const vintage: TcgdexSet = { id: "base1", name: "Base", releaseDate: null, cardCount: { total: 1, official: 102 }, cards: [{ id: "base1-x", localId: "Charizard", name: "Charizard", image: null }] };
     expect(toProductRows("en", vintage)[0]).toMatchObject({ number_printed: "Charizard", number_num: null });
