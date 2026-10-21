@@ -18,9 +18,23 @@ export function imagesJa(opts: { size: "SM" | "LG"; fetchImpl?: typeof fetch; to
     const work = await loadJaImageWork(db, { replaceLimitless: opts.size === "LG" });
     let seen = 0, copied = 0, missing = 0, failed = 0;
     let stopped = false;
+    // These image hosts answer 403 for objects that do not exist, so 403 means "missing".
+    // Only 429 pauses at once; a long run of 403s is checked against a known-good probe.
+    let run403 = 0;
     const fetchPng = async (url: string): Promise<Buffer | null> => {
       const res = await get(url, { headers: UA });
-      if (res.status === 403 || res.status === 429) { stopped = true; throw new PausedError(res.status, url); }
+      if (res.status === 429) { stopped = true; throw new PausedError(res.status, url); }
+      if (res.status === 403) {
+        run403 += 1;
+        if (run403 >= 20) {
+          const probeUrl = limitless.logoUrl("SV11B");
+          const probe = await get(probeUrl, { headers: UA });
+          if (probe.status === 403 || probe.status === 429) { stopped = true; throw new PausedError(probe.status, probeUrl); }
+          run403 = 0;
+        }
+        return null;
+      }
+      run403 = 0;
       if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) return null;
       return Buffer.from(await res.arrayBuffer());
     };

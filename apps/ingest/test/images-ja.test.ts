@@ -33,7 +33,7 @@ describe("images:ja", () => {
     expect(stats).toMatchObject({ items_seen: 4, items_new: 2 });
   });
 
-  it("stops both workers when a card returns 403", async () => {
+  it("stops both workers when a card returns 429", async () => {
     const { imagesJa } = await import("../src/jobs/images-ja");
     const db = await import("@pcg/db");
     vi.mocked(db.loadJaImageWork).mockResolvedValueOnce({
@@ -43,7 +43,7 @@ describe("images:ja", () => {
     const urls: string[] = [];
     const fetchImpl = vi.fn(async (url: string) => {
       urls.push(url);
-      if (url.includes("SV11B_1_")) return new Response("no", { status: 403 });
+      if (url.includes("SV11B_1_")) return new Response("no", { status: 429 });
       return png.clone();
     }) as unknown as typeof fetch;
     await expect(imagesJa({ size: "SM", fetchImpl, toWebp: async (b) => b, sleep: async () => {} })({ db: {} as never, log: () => {} })).rejects.toBeInstanceOf(PausedError);
@@ -61,5 +61,41 @@ describe("images:ja", () => {
     expect(calls.card).toHaveLength(1);
     expect(logs.some((m) => m.includes("corrupt"))).toBe(true);
     expect(stats).toMatchObject({ items_seen: 4, items_new: 3 });
+  });
+
+  it("treats 403 as missing for a logo and a card and carries on", async () => {
+    const { imagesJa } = await import("../src/jobs/images-ja");
+    const fetchImpl = vi.fn(async (url: string) => {
+      if (url.includes("/XX.png")) return new Response("", { status: 403 });
+      if (url.includes("SV11B_2_")) return new Response("", { status: 403 });
+      return png.clone();
+    }) as unknown as typeof fetch;
+    const stats = await imagesJa({ size: "SM", fetchImpl, toWebp: async (b) => b, sleep: async () => {} })({ db: {} as never, log: () => {} });
+    expect(calls.logo).toEqual(["SV11B"]);
+    expect(calls.card).toEqual(["SV11B-001"]);
+    expect(stats).toMatchObject({ items_seen: 4, items_new: 2 });
+  });
+
+  const manyCards = async () => {
+    const db = await import("@pcg/db");
+    vi.mocked(db.loadJaImageWork).mockResolvedValueOnce({
+      sets: [],
+      cards: Array.from({ length: 30 }, (_, i) => ({ id: `SV11B-${i + 1}`, set_id: "SV11B", code: "SV11B", number: String(i + 1) })),
+    });
+  };
+
+  it("pauses after 20 consecutive 403s when the probe is also 403", async () => {
+    const { imagesJa } = await import("../src/jobs/images-ja");
+    await manyCards();
+    const fetchImpl = vi.fn(async () => new Response("", { status: 403 })) as unknown as typeof fetch;
+    await expect(imagesJa({ size: "SM", fetchImpl, toWebp: async (b) => b, sleep: async () => {} })({ db: {} as never, log: () => {} })).rejects.toBeInstanceOf(PausedError);
+  });
+
+  it("continues after 20 consecutive 403s when the probe is 200", async () => {
+    const { imagesJa } = await import("../src/jobs/images-ja");
+    await manyCards();
+    const fetchImpl = vi.fn(async (url: string) => (url.endsWith("/SV11B.png") ? png.clone() : new Response("", { status: 403 }))) as unknown as typeof fetch;
+    const stats = await imagesJa({ size: "SM", fetchImpl, toWebp: async (b) => b, sleep: async () => {} })({ db: {} as never, log: () => {} });
+    expect(stats).toMatchObject({ items_seen: 30, items_new: 0 });
   });
 });

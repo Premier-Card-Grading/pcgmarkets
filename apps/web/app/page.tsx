@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AppHeader } from "@/components/AppHeader";
 import { SiteFooter } from "@/components/SiteFooter";
 import { SearchField } from "@/components/SearchField";
@@ -34,7 +35,7 @@ export default async function Home() {
               {s.sale_count > 0 && <span className="col-start-2 row-span-2 rounded-full bg-sunk px-[9px] py-0.5 text-[12.5px] font-bold text-ink-2 tnum">{s.sale_count}</span>}
               <span className="text-[12.5px] text-mute">{[s.printed_code, s.language === "ja" ? "Japanese" : "English"].filter(Boolean).join(" · ")}</span>
             </a></li>))}
-            <li className="md:col-span-2"><a href="/sets" className="block px-3 py-2.5 text-[13.5px] font-semibold text-teal no-underline">All {setTotal.toLocaleString("en-US")} sets →</a></li>
+            <li className="md:col-span-2"><Link href="/sets" className="block px-3 py-2.5 text-[13.5px] font-semibold text-teal no-underline">All {setTotal.toLocaleString("en-US")} sets →</Link></li>
           </ul>
         </section>
         <section>
