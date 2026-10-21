@@ -4,7 +4,12 @@ import { CARD_NAMES, ERA_PREFIXES, PREFIXES, SUFFIXES } from "./card-names-ja-en
 /** Where a card was printed; era-dependent names need it and resolve to null without it. */
 export interface NameContext { series?: string | null }
 
-const SPECIES = species as Record<string, string>;
+/** Width-insensitive Japanese: "ポリゴン２" and "ポリゴン2", "ＶＭＡＸ" and "VMAX" are the same name. */
+export const normaliseJa = (s: string) => s.normalize("NFKC");
+const byNormalisedKey = (t: Record<string, string>) => Object.fromEntries(Object.entries(t).map(([k, v]) => [normaliseJa(k), v]));
+
+const SPECIES = byNormalisedKey(species as Record<string, string>);
+const CARDS = byNormalisedKey(CARD_NAMES);
 
 /** Own-property lookup, so inherited keys such as "constructor" never match. */
 function lookup(table: Record<string, string>, key: string): string | undefined {
@@ -25,7 +30,7 @@ function withSuffix(name: string): string | null {
 
 /** One Pokémon or other card, without tag-team "&" parts. */
 function single(name: string, ctx: NameContext): string | null {
-  const whole = lookup(CARD_NAMES, name);
+  const whole = lookup(CARDS, name);
   if (whole) return whole;
   const plain = withSuffix(name);
   if (plain) return plain;
@@ -52,7 +57,7 @@ function single(name: string, ctx: NameContext): string | null {
 
 /** Official English name for a Japanese card name, or null unless every part is known. */
 export function translateJaCardName(nameJa: string | null, ctx: NameContext = {}): string | null {
-  const name = nameJa?.trim();
+  const name = nameJa == null ? "" : normaliseJa(nameJa).trim();
   if (!name) return null;
   if (!name.includes("&")) return single(name, ctx);
   // Tag teams: "ピカチュウ&ゼクロムGX" -> "Pikachu & Zekrom-GX"; only the last part carries the suffix.

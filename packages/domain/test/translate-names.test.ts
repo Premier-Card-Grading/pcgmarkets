@@ -60,6 +60,13 @@ describe("translateJaCardName", () => {
     expect(translateJaCardName("アルセウス&ディアルガ&パルキアGX")).toBe("Arceus & Dialga & Palkia-GX");
     expect(translateJaCardName("ピカチュウ&なぞGX")).toBeNull();
   });
+  it("ignores full-width vs half-width differences", () => {
+    expect(translateJaCardName("ポリゴン2")).toBe("Porygon2");
+    expect(translateJaCardName("ポリゴン２")).toBe("Porygon2");
+    expect(translateJaCardName("ポリゴンZ")).toBe("Porygon-Z");
+    expect(translateJaCardName("タイプ:ヌル")).toBe("Type: Null");
+    expect(translateJaCardName("ミュウＶＭＡＸ")).toBe("Mew VMAX");
+  });
   it("ignores surrounding whitespace", () => { expect(translateJaCardName(" ピカチュウ ")).toBe("Pikachu"); });
   it("returns null when any part is unknown, never a partial name", () => {
     expect(translateJaCardName("なぞのカード")).toBeNull();

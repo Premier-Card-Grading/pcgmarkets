@@ -1,6 +1,6 @@
 import species from "./species-ja-en.json";
 import { CARD_NAMES, ERA_PREFIXES, ORIGINAL_ERA_SERIES, RETIRED_NAMES } from "./card-names-ja-en";
-import { translateJaCardName } from "./translate";
+import { normaliseJa, translateJaCardName } from "./translate";
 
 /**
  * R15: one English name per Japanese card from Limitless's English page (l) and our curated
@@ -64,21 +64,24 @@ const prismForm = (name: string | null) => (name == null || name.endsWith("◇")
 /** Reverse dictionary: English name -> the Japanese names that carry it. */
 const CLAIMS = new Map<string, string[]>();
 for (const table of [CARD_NAMES, species as Record<string, string>]) {
-  for (const [ja, en] of Object.entries(table)) CLAIMS.set(en, [...(CLAIMS.get(en) ?? []), ja]);
+  for (const [key, en] of Object.entries(table)) {
+    const ja = normaliseJa(key);
+    if (!CLAIMS.get(en)?.includes(ja)) CLAIMS.set(en, [...(CLAIMS.get(en) ?? []), ja]);
+  }
 }
 const hasJapanese = (s: string) => /[぀-ヿ一-鿿]/.test(s);
 
 /** A different Japanese card owns this English name in our dictionary (e.g. a swapped Limitless row). */
 function claimedElsewhere(nameJa: string | null, en: string): string | null {
   const owners = CLAIMS.get(en);
-  const ja = nameJa?.trim() ?? "";
+  const ja = normaliseJa(nameJa ?? "").trim();
   if (!owners || !hasJapanese(ja) || owners.includes(ja)) return null;
   return owners[0]!;
 }
 
 /** Why a stored name is known to be wrong under the current rules, or null. */
 function contradiction(nameJa: string | null, prev: string, series: string | null | undefined): string | null {
-  const ja = nameJa?.trim() ?? "";
+  const ja = normaliseJa(nameJa ?? "").trim();
   if (RETIRED_NAMES[ja]?.includes(prev)) return `"${prev}" for ${ja} is not certain for every era`;
   for (const [prefix] of ERA_PREFIXES) {
     if (ja.startsWith(prefix) && prev.startsWith("Rocket's ") && !(series != null && (ORIGINAL_ERA_SERIES as readonly string[]).includes(series)))

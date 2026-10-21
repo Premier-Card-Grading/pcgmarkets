@@ -83,6 +83,10 @@ describe("resolveCardNameEn: swapped Limitless names (M6-098 / M6-099)", () => {
     expect(catcher.nameEn).toBeNull();
     expect(catcher.note).toMatch(/Special Vest/);
   });
+  it("compares Japanese names width-insensitively (ポリゴン2 / ポリゴン２)", () => {
+    expect(resolveCardNameEn({ nameJa: "ポリゴン2", limitlessEn: "Porygon2", previous: "Porygon2" })).toEqual({ nameEn: "Porygon2", note: null });
+    expect(r({ nameJa: "ポリゴンZ", limitlessEn: "Porygon-Z" })).toBe("Porygon-Z");
+  });
   it("does not treat an English name_ja row as a swap", () => {
     expect(r({ nameJa: "Magikarp", limitlessEn: "Magikarp" })).toBe("Magikarp");
   });
