@@ -6,6 +6,8 @@ describe("pokemontcg", () => {
     expect(ptcgSetId("swsh4.5sv")).toBe("swsh45sv");
     expect(ptcgSetId("tk-ex-latia")).toBe("tk1a");
     expect(ptcgSetId("swshp")).toBe("swshp");
+    expect(ptcgSetId("sm3.5")).toBe("sm35");
+    expect(ptcgSetId("hgssp")).toBe("hsp");
   });
   it("matches by number, ignoring leading zeros and case", () => {
     const ours = [
@@ -30,5 +32,29 @@ describe("pokemontcg ambiguous numbers", () => {
       { number: "6", small: "https://images.pokemontcg.io/x/6.png" },
     ];
     expect(matchImages(ours, theirs)).toEqual([{ id: "x-006", url: "https://images.pokemontcg.io/x/6.png" }]);
+  });
+});
+
+describe("pokemontcg listCards", () => {
+  it("retries a request when the API answers with an intermittent 5xx", async () => {
+    const { listCards } = await import("../src/pokemontcg");
+    const calls: string[] = [];
+    const ok = { data: [{ number: "1", images: { small: "https://images.pokemontcg.io/hsp/1.png" } }], totalCount: 1 };
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (url: string) => {
+      calls.push(url);
+      return calls.length < 3 ? new Response("err", { status: 500 }) : new Response(JSON.stringify(ok), { status: 200 });
+    }) as typeof fetch;
+    try {
+      expect(await listCards("hsp", { retryDelayMs: 1, fetcher: (u) => fetch(u) })).toEqual([{ number: "1", small: "https://images.pokemontcg.io/hsp/1.png" }]);
+      expect(calls).toHaveLength(3);
+    } finally { globalThis.fetch = real; }
+  });
+  it("gives up after the last attempt", async () => {
+    const { listCards } = await import("../src/pokemontcg");
+    const real = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("err", { status: 502 })) as typeof fetch;
+    try { await expect(listCards("hsp", { retryDelayMs: 1, fetcher: (u) => fetch(u) })).rejects.toThrow("pokemontcg hsp: 502"); }
+    finally { globalThis.fetch = real; }
   });
 });
