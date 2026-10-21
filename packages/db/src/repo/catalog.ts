@@ -24,13 +24,9 @@ export async function loadLimitlessOwnedSetIds(db: Db): Promise<Set<string>> {
 }
 
 export async function loadCatalog(db: Db): Promise<InMemoryCatalog> {
-  const sets = must(await db.from("sets").select("*")) as SetRow[];
-  const products: ProductRow[] = [];
-  for (let from = 0; ; from += 1000) {
-    const page = must(await db.from("products").select("id,set_id,number_num,number_denom,number_suffix,language").range(from, from + 999)) as ProductRow[];
-    products.push(...page);
-    if (page.length < 1000) break;
-  }
+  const sets = await selectAll<SetRow>((f, t) => db.from("sets").select("*").order("id").range(f, t));
+  const products = await selectAll<Pick<ProductRow, "id" | "set_id" | "number_num" | "number_denom" | "number_suffix" | "language">>((f, t) =>
+    db.from("products").select("id,set_id,number_num,number_denom,number_suffix,language").order("id").range(f, t));
   const setRefs: SetRef[] = sets.map((s) => ({ id: s.id, printedCode: s.printed_code, language: s.language, cardCount: s.card_count, nameEn: s.name_en, nameJa: s.name_ja, aliases: s.aliases ?? [] }));
   const productRefs: ProductRef[] = products.map((p) => ({ id: p.id, setId: p.set_id, numberNum: p.number_num, numberDenom: p.number_denom, numberSuffix: p.number_suffix, language: p.language }));
   return new InMemoryCatalog(setRefs, productRefs);
