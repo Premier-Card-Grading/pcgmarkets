@@ -48,8 +48,11 @@ export function sortCards(cards: SetCard[], by: "number" | "price", now: Date): 
   return [...cards].sort((a, b) => usd(b) - usd(a) || byNum(a, b));
 }
 
-async function saleCounts(db: SupabaseClient): Promise<Map<string, number>> {
-  const { data } = await db.from("set_sale_counts").select("id,sale_count");
+/** Sale counts per set (one set when `id` is given). A failed read throws rather than showing every set as unsold. */
+async function saleCounts(db: SupabaseClient, id?: string): Promise<Map<string, number>> {
+  const q = db.from("set_sale_counts").select("id,sale_count");
+  const { data, error } = await (id == null ? q : q.eq("id", id));
+  if (error) throw new Error(error.message);
   return new Map(((data ?? []) as { id: string; sale_count: number }[]).map((r) => [r.id, r.sale_count]));
 }
 
@@ -60,7 +63,7 @@ export async function loadSetsIndex(db: SupabaseClient, lang: Lang) {
     db.from("sets").select("id", { count: "exact", head: true }).eq("language", "en"),
     db.from("sets").select("id", { count: "exact", head: true }).eq("language", "ja"),
   ]);
-  if (rows.error) throw new Error(rows.error.message);
+  for (const r of [rows, en, ja]) if (r.error) throw new Error(r.error.message);
   const tiles = ((rows.data ?? []) as unknown as SetDbRow[]).map((r) => toTile(r, sales));
   return { groups: groupBySeries(tiles), counts: { en: en.count ?? 0, ja: ja.count ?? 0 } };
 }
@@ -70,7 +73,7 @@ export async function loadSetPage(db: SupabaseClient, id: string) {
   if (error) throw new Error(error.message);
   if (!row) return null;
   const r = row as unknown as SetDbRow;
-  const sales = await saleCounts(db);
+  const sales = await saleCounts(db, id);
   const cards: SetCard[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error: e } = await db.from("public_set_cards").select("*").eq("set_id", id).order("number_num", { ascending: true, nullsFirst: false }).order("id").range(from, from + 999);
