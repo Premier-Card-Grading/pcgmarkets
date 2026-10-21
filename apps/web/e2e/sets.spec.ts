@@ -2,14 +2,13 @@ import { test, expect, type Page } from "@playwright/test";
 
 // Needs the live Supabase DB with the imported catalogue (SV11B and PMCG1 exist as set ids).
 test.setTimeout(120_000);
-test.use({ viewport: { width: 390, height: 844 } });
 
 function watchConsole(page: Page): string[] {
   const errors: string[] = [];
   page.on("console", (m) => {
     if (m.type() !== "error") return;
-    // Remote set logos can 404 in the image optimizer; that is not a page error.
-    if (/_next\/image|Failed to load resource.*404/i.test(m.text() + (m.location().url ?? ""))) return;
+    // Remote set logos can 404 through the image optimizer; only that 404 is not a page error.
+    if (/404/.test(m.text()) && /\/_next\/image\b/.test(m.location().url ?? "")) return;
     errors.push(m.text());
   });
   page.on("pageerror", (e) => errors.push(String(e)));
@@ -37,7 +36,6 @@ test("SV11B: a full card number finds exactly one card", async ({ page }) => {
   const errors = watchConsole(page);
   await openSet(page, "SV11B");
   await search(page, "069/174", 1);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);
 });
 
@@ -48,6 +46,17 @@ test("PMCG1: a bare number narrows to the 003 card", async ({ page }) => {
   await search(page, "3", 1);
   expect(before).toBeGreaterThan(1);
   await expect(tiles(page).first()).toContainText(/0?03/);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);
+});
+
+// Phone projects (iPhone 13, 390px wide) only: the set pages never scroll sideways.
+test.describe("at 390px phone width", () => {
+  test.beforeEach(({}, testInfo) => { test.skip(!testInfo.project.name.startsWith("phone"), "phone projects only"); });
+  for (const id of ["SV11B", "PMCG1"]) {
+    test(`${id}: no horizontal scroll`, async ({ page }) => {
+      await openSet(page, id);
+      expect(page.viewportSize()?.width).toBe(390);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    });
+  }
 });
