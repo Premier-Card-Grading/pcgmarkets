@@ -68,7 +68,9 @@ export function parseSetList(html: string): ParsedSetList {
 }
 
 export function mergeSetPages(code: string, ja: ParsedSetList, en: ParsedSetList): LimitlessSetPage {
-  const enByNum = new Map(en.rows.map((r) => [r.number, r]));
+  // A number the EN page repeats is ambiguous: no English name rather than a guess.
+  const enByNum = new Map<string, ParsedSetList["rows"][number] | null>();
+  for (const r of en.rows) enByNum.set(r.number, enByNum.has(r.number) ? null : r);
   return {
     code, nameJa: ja.nameJa, nameEn: ja.nameEn ?? en.nameEn, releaseDate: ja.releaseDate ?? en.releaseDate,
     cards: ja.rows.map((r) => ({ number: r.number, nameJa: r.name || null, nameEn: enByNum.get(r.number)?.name || null, type: r.type, rarity: r.rarity, imageXs: r.imageXs })),

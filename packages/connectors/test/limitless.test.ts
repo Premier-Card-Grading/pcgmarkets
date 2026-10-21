@@ -30,6 +30,12 @@ describe("limitless set list", () => {
     expect(page.cards[2]).toMatchObject({ number: "3", nameJa: "ジャローダex", nameEn: "Serperior ex", rarity: "Double Rare" });
     expect(page.cards.find((c) => c.number === "173")).toMatchObject({ nameEn: "N's Plot", type: "Supporter" });
   });
+  it("leaves nameEn null when the English page repeats a number (ambiguous join)", () => {
+    const five = en.rows.find((r) => r.number === "5")!;
+    const page = mergeSetPages("SV11B", ja, { ...en, rows: [...en.rows, { ...five, name: "Some Other Card" }] });
+    expect(page.cards.find((c) => c.number === "5")).toMatchObject({ nameJa: "ヤナッキー", nameEn: null });
+    expect(page.cards.find((c) => c.number === "3")).toMatchObject({ nameEn: "Serperior ex" });
+  });
   it("keeps a row whose English twin is missing, with nameEn null", () => {
     const page = mergeSetPages("SV11B", ja, { ...en, rows: en.rows.filter((r) => r.number !== "5") });
     expect(page.cards.find((c) => c.number === "5")).toMatchObject({ nameJa: "ヤナッキー", nameEn: null });
