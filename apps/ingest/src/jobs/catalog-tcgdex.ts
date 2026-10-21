@@ -1,6 +1,18 @@
 import type { Job } from "../run";
 import { tcgdex } from "@pcg/connectors";
-import { upsertSets, upsertProducts, loadLimitlessOwnedSetIds } from "@pcg/db";
+import { resolveCardNameEn } from "@pcg/domain";
+import { upsertSets, upsertProducts, loadLimitlessOwnedSetIds, loadSetProducts, type ProductRow } from "@pcg/db";
+
+/** JA rows on TCGdex-owned sets: dictionary name, else the stored one; a stored name is only dropped with a logged reason. */
+async function withStoredNames(db: Parameters<Job>[0]["db"], log: (m: string) => void, setId: string, series: string | null, rows: ProductRow[]): Promise<ProductRow[]> {
+  const stored = new Map((await loadSetProducts(db, setId)).map((p) => [p.id, p.name_en]));
+  return rows.map((r) => {
+    const previous = stored.get(r.id) ?? null;
+    const res = resolveCardNameEn({ nameJa: r.name_ja, limitlessEn: null, series, previous });
+    if (res.note) log(`${r.id} ${r.name_ja ?? ""}: name_en ${JSON.stringify(previous)} -> ${JSON.stringify(res.nameEn)}: ${res.note}`);
+    return { ...r, name_en: res.nameEn };
+  });
+}
 
 export const catalogTcgdex: Job = async ({ db, log }) => {
   let sets = 0, products = 0, skipped = 0;
@@ -16,7 +28,8 @@ export const catalogTcgdex: Job = async ({ db, log }) => {
       const id = tcgdex.catalogSetId(lang, full.id, enIds);
       const setRow = tcgdex.toSetRow(lang, full, id);
       await upsertSets(db, [owned.has(id) ? tcgdex.withoutLimitlessOwned(setRow, "set") : setRow]);
-      const rows = tcgdex.toProductRows(lang, full, id);
+      let rows = tcgdex.toProductRows(lang, full, id);
+      if (lang === "ja" && !owned.has(id)) rows = await withStoredNames(db, log, id, setRow.series ?? null, rows);
       await upsertProducts(db, owned.has(id) ? rows.map((r) => tcgdex.withoutLimitlessOwned(r, "product")) : rows);
       sets += 1; products += rows.length;
     }

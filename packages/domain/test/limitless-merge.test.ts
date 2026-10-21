@@ -22,6 +22,10 @@ describe("mergeLimitlessCards", () => {
   it("never merges a non-numeric number into a numeric card", () => {
     expect(mergeLimitlessCards("SV11B", existing, [card("TG01")])[0]).toMatchObject({ id: "SV11B-TG01", isNew: true });
   });
+  it("carries the Limitless card type through for Mega Evolution and Prism Star rules", () => {
+    expect(mergeLimitlessCards("XY2", [], [{ ...card("55", null), type: "N Mega Evolution", rarity: "Double Rare" }])[0]).toMatchObject({ type: "N Mega Evolution", rarity: "Double Rare" });
+    expect(mergeLimitlessCards("SV11B", existing, [card("1")])[0]!.type).toBeNull();
+  });
   it("keeps a null English name rather than inventing one", () => {
     expect(mergeLimitlessCards("SV11B", existing, [card("1", null)])[0]!.name_en).toBeNull();
   });

@@ -91,7 +91,7 @@ export function toProductRows(lang: Language, set: TcgdexSet, setId = set.id): P
     return {
       id: setId === set.id ? c.id : `${setId}-${c.localId}`, set_id: setId,
       number_printed: n?.printed ?? c.localId, number_num: n?.num ?? null, number_denom: n?.denom ?? null, number_suffix: n?.suffix ?? null,
-      name_en: lang === "en" ? c.name : translateJaCardName(c.name), name_ja: lang === "ja" ? c.name : null, rarity: null, language: lang,
+      name_en: lang === "en" ? c.name : translateJaCardName(c.name, { series: seriesFor(lang, set) }), name_ja: lang === "ja" ? c.name : null, rarity: null, language: lang,
       image_url: c.image ? `${c.image}/high.webp` : null, image_source: c.image ? "tcgdex" : null,
     };
   });

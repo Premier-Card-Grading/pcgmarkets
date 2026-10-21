@@ -1,5 +1,8 @@
 import species from "./species-ja-en.json";
-import { CARD_NAMES, PREFIXES, SUFFIXES } from "./card-names-ja-en";
+import { CARD_NAMES, ERA_PREFIXES, PREFIXES, SUFFIXES } from "./card-names-ja-en";
+
+/** Where a card was printed; era-dependent names need it and resolve to null without it. */
+export interface NameContext { series?: string | null }
 
 const SPECIES = species as Record<string, string>;
 
@@ -21,7 +24,7 @@ function withSuffix(name: string): string | null {
 }
 
 /** One Pokémon or other card, without tag-team "&" parts. */
-function single(name: string): string | null {
+function single(name: string, ctx: NameContext): string | null {
   const whole = lookup(CARD_NAMES, name);
   if (whole) return whole;
   const plain = withSuffix(name);
@@ -33,6 +36,12 @@ function single(name: string): string | null {
     if (rest.endsWith("ex") && sp(rest.slice(0, -2))) return `Mega ${sp(rest.slice(0, -2))} ex`;
     return null;
   }
+  for (const [ja, byEra] of ERA_PREFIXES) {
+    if (!name.startsWith(ja)) continue;
+    const en = byEra.find(([series]) => ctx.series != null && series.includes(ctx.series))?.[1];
+    const rest = withSuffix(name.slice(ja.length).trim());
+    return en && rest ? `${en} ${rest}` : null;
+  }
   for (const [ja, en] of PREFIXES) {
     if (!name.startsWith(ja)) continue;
     const rest = withSuffix(name.slice(ja.length).trim());
@@ -42,10 +51,10 @@ function single(name: string): string | null {
 }
 
 /** Official English name for a Japanese card name, or null unless every part is known. */
-export function translateJaCardName(nameJa: string | null): string | null {
+export function translateJaCardName(nameJa: string | null, ctx: NameContext = {}): string | null {
   const name = nameJa?.trim();
   if (!name) return null;
-  if (!name.includes("&")) return single(name);
+  if (!name.includes("&")) return single(name, ctx);
   // Tag teams: "ピカチュウ&ゼクロムGX" -> "Pikachu & Zekrom-GX"; only the last part carries the suffix.
   const parts = name.split("&").map((p) => p.trim());
   const last = withSuffix(parts[parts.length - 1]!);

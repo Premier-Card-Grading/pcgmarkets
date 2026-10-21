@@ -9,9 +9,21 @@ describe("translateJaCardName", () => {
     expect(translateJaCardName("ミュウ☆")).toBe("Mew ☆");
   });
   it("handles owner and form prefixes", () => {
-    expect(translateJaCardName("ロケット団のミュウツー")).toBe("Rocket's Mewtwo");
     expect(translateJaCardName("わるいリザードン")).toBe("Dark Charizard");
     expect(translateJaCardName("カスミのスターミー")).toBe("Misty's Starmie");
+  });
+  it("scopes ロケット団の by era: Rocket's (Gym era), Team Rocket's (Scarlet & Violet, Mega), else null", () => {
+    expect(translateJaCardName("ロケット団のサンダー", { series: "Original era" })).toBe("Rocket's Zapdos");
+    expect(translateJaCardName("ロケット団のミュウツーex", { series: "Scarlet & Violet" })).toBe("Team Rocket's Mewtwo ex");
+    expect(translateJaCardName("ロケット団のクロバットex", { series: "Mega" })).toBe("Team Rocket's Crobat ex");
+    expect(translateJaCardName("ロケット団のミミッキュGX", { series: "Sun & Moon" })).toBeNull();
+    expect(translateJaCardName("ロケット団のミュウツー", { series: "ADV / PCG" })).toBeNull();
+    expect(translateJaCardName("ロケット団のミュウツー")).toBeNull();
+  });
+  it("has no era-ambiguous Trainer names", () => {
+    // "Super Potion" on old prints, "Hyper Potion" on Sword & Shield prints.
+    expect(translateJaCardName("すごいきずぐすり")).toBeNull();
+    expect(translateJaCardName("すごいきずぐすり", { series: "Sword & Shield" })).toBeNull();
   });
   it("uses the dictionary for Trainers and Energy", () => {
     expect(translateJaCardName("オーキド博士")).toBe("Professor Oak");

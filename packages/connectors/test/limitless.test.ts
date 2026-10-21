@@ -47,6 +47,19 @@ describe("limitless older sets (XY2)", () => {
   });
 });
 
+describe("limitless Mega Evolution and Prism Star rows", () => {
+  it("XY2: the JA name drops the Mega M; only the type column says Mega Evolution", () => {
+    const page = mergeSetPages("XY2", parseSetList(fx("limitless-set-XY2-ja.html")), parseSetList(fx("limitless-set-XY2-en.html")));
+    expect(page.cards.find((c) => c.number === "55")).toMatchObject({ nameJa: "リザードンEX", nameEn: null, type: "N Mega Evolution", rarity: "Double Rare" });
+  });
+  it("SM8: the JA name drops ◇; only the EN name says Prism Star (type and rarity do not)", () => {
+    const page = mergeSetPages("SM8", parseSetList(fx("limitless-set-SM8-ja.html")), parseSetList(fx("limitless-set-SM8-en.html")));
+    expect(page.cards.find((c) => c.number === "15")).toMatchObject({ nameJa: "セレビィ", nameEn: "Celebi Prism Star", type: "G Basic", rarity: null });
+    expect(page.cards.find((c) => c.number === "92")).toMatchObject({ nameJa: "ルザミーネ", nameEn: "Lusamine Prism Star", type: "Supporter" });
+    expect(page.cards.filter((c) => /Prism Star/.test(c.nameEn ?? "")).map((c) => c.number)).toEqual(["15", "92", "93"]);
+  });
+});
+
 describe("limitless helpers", () => {
   it("parses both date styles", () => {
     expect(parseLimitlessDate("16 Sep 26")).toBe("2026-09-16");
