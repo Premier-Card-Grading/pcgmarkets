@@ -10,7 +10,8 @@ vi.mock("@pcg/connectors", async (orig) => {
     XY2: { code: "XY2", nameJa: null, nameEn: null, releaseDate: null, cards: [{ ...card("55", null), nameJa: "リザードンEX", type: "N Mega Evolution", rarity: "Double Rare" }] },
     M6: { code: "M6", nameJa: null, nameEn: null, releaseDate: null, cards: [
       { ...card("98", "Pokemon Catcher"), nameJa: "ポケモンキャッチャー" }, { ...card("99", "Special Vest"), nameJa: "とくちゅうチョッキ" },
-      { ...card("10", null), nameJa: "ロケット団のミュウツーex" }, { ...card("11", "Zacian-V"), nameJa: "ザシアンV" }] },
+      { ...card("10", null), nameJa: "ロケット団のミュウツーex" }, { ...card("11", "Zacian-V"), nameJa: "ザシアンV" },
+      { ...card("12", "Porygon2"), nameJa: "ポリゴン2" }] },
     B: { code: "B", nameJa: null, nameEn: null, releaseDate: null, cards: [card("1")] },
   };
   return { ...real, limitless: { ...real.limitless,
@@ -18,7 +19,7 @@ vi.mock("@pcg/connectors", async (orig) => {
       { code: "A", nameEn: null, releaseDate: null, cardCount: 999, series: null },
       { code: "C", nameEn: null, releaseDate: null, cardCount: 4, series: null },
       { code: "XY2", nameEn: null, releaseDate: null, cardCount: 1, series: "XY" },
-      { code: "M6", nameEn: null, releaseDate: null, cardCount: 4, series: "Mega" },
+      { code: "M6", nameEn: null, releaseDate: null, cardCount: 5, series: "Mega" },
       { code: "B", nameEn: "B set", releaseDate: null, cardCount: 5, series: null }]),
     getSet: vi.fn(async (c: string) => { if (c === "B") throw new Error("boom"); return pages[c]; }),
     ourSetIdFor: vi.fn((c: string) => (c === "A" ? "SVA" : c === "C" ? "SVC" : c === "XY2" || c === "M6" ? c : null)) } };
@@ -31,6 +32,7 @@ const xyRows = [{ id: "XY2-055", set_id: "XY2", number_printed: "055", number_nu
 const m6Rows = [
   { id: "M6-098", set_id: "M6", number_printed: "098", number_num: 98, number_denom: null, number_suffix: null, name_en: "Pokemon Catcher", name_ja: "とくちゅうチョッキ", rarity: null, language: "ja", image_url: null, image_source: null },
   { id: "M6-099", set_id: "M6", number_printed: "099", number_num: 99, number_denom: null, number_suffix: null, name_en: "Special Vest", name_ja: "ポケモンキャッチャー", rarity: null, language: "ja", image_url: null, image_source: null },
+  { id: "M6-012", set_id: "M6", number_printed: "012", number_num: 12, number_denom: null, number_suffix: null, name_en: "Porygon2", name_ja: "ポリゴン２", rarity: null, language: "ja", image_url: "https://x/M6-012.webp", image_source: "limitless" },
 ];
 const sets: Record<string, unknown>[][] = [];
 const prods: Record<string, unknown>[][] = [];
@@ -57,11 +59,17 @@ describe("catalog:limitless", () => {
     const named = (set: string) => prods.find((r) => r[0]!.set_id === set)!.map((p) => [p.id, p.name_en]);
     // XY2-055 is a Mega Evolution: Limitless drops the M from リザードンEX
     expect(named("XY2")).toEqual([["XY2-055", "M Charizard-EX"]]);
-    // M6-098/099: our (TCGdex) name_ja is swapped against Limitless; names follow the name_ja the row shows,
-    // so both are dropped and logged, and the JA mismatch is logged too
-    expect(logs.filter((l) => /^M6-09[89]: name_ja differs/.test(l))).toHaveLength(2);
-    expect(named("M6")).toEqual([["M6-098", null], ["M6-099", null], ["M6-010", "Team Rocket's Mewtwo ex"], ["M6-011", "Zacian V"]]);
-    expect(logs.filter((l) => /^(XY2-055|M6-098|M6-099) /.test(l))).toHaveLength(3);
+    // R17: Limitless owns name_ja on its sets. M6-098/099 had TCGdex's swapped name_ja; Limitless's replaces it, the stored
+    // English name (which belonged to the wrong Japanese name) is not trusted, and both changes are logged.
+    const m6 = new Map(prods.find((r) => r[0]!.set_id === "M6")!.map((p) => [p.id, p]));
+    expect(named("M6")).toEqual([["M6-098", "Pokémon Catcher"], ["M6-099", "Special Vest"], ["M6-010", "Team Rocket's Mewtwo ex"], ["M6-011", "Zacian V"], ["M6-012", "Porygon2"]]);
+    expect(m6.get("M6-098")).toMatchObject({ name_ja: "ポケモンキャッチャー" });
+    expect(m6.get("M6-099")).toMatchObject({ name_ja: "とくちゅうチョッキ" });
+    // same name up to width and spacing: our spelling stays, nothing logged; the rest of the row is kept
+    expect(m6.get("M6-012")).toMatchObject({ name_ja: "ポリゴン２", image_url: "https://x/M6-012.webp", image_source: "limitless" });
+    expect(logs.filter((l) => /^M6-09[89]: name_ja "/.test(l))).toHaveLength(2);
+    expect(logs.some((l) => l.startsWith("M6-012"))).toBe(false);
+    expect(logs.filter((l) => /^(XY2-055|M6-098|M6-099) /.test(l))).toHaveLength(1);
     expect(logs.some((l) => l.startsWith("set B: boom"))).toBe(true);
     expect(logs.at(-1)).toContain("1 sets failed");
   });
