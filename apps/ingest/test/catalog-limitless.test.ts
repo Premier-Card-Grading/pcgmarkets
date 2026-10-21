@@ -9,7 +9,7 @@ vi.mock("@pcg/connectors", async (orig) => {
       { ...card("1", null), nameJa: "キャタピー" }, { ...card("2", null), nameJa: "なぞ" }, { ...card("3", "Limitless Name"), nameJa: "なぞ3" }, { ...card("4", null), nameJa: "なぞ" }] },
     XY2: { code: "XY2", nameJa: null, nameEn: null, releaseDate: null, cards: [{ ...card("55", null), nameJa: "リザードンEX", type: "N Mega Evolution", rarity: "Double Rare" }] },
     M6: { code: "M6", nameJa: null, nameEn: null, releaseDate: null, cards: [
-      { ...card("98", "Pokemon Catcher"), nameJa: "とくちゅうチョッキ" }, { ...card("99", "Special Vest"), nameJa: "ポケモンキャッチャー" },
+      { ...card("98", "Pokemon Catcher"), nameJa: "ポケモンキャッチャー" }, { ...card("99", "Special Vest"), nameJa: "とくちゅうチョッキ" },
       { ...card("10", null), nameJa: "ロケット団のミュウツーex" }, { ...card("11", "Zacian-V"), nameJa: "ザシアンV" }] },
     B: { code: "B", nameJa: null, nameEn: null, releaseDate: null, cards: [card("1")] },
   };
@@ -57,7 +57,9 @@ describe("catalog:limitless", () => {
     const named = (set: string) => prods.find((r) => r[0]!.set_id === set)!.map((p) => [p.id, p.name_en]);
     // XY2-055 is a Mega Evolution: Limitless drops the M from リザードンEX
     expect(named("XY2")).toEqual([["XY2-055", "M Charizard-EX"]]);
-    // M6-098/099: Limitless swapped the English names; both are dropped and logged, never kept
+    // M6-098/099: our (TCGdex) name_ja is swapped against Limitless; names follow the name_ja the row shows,
+    // so both are dropped and logged, and the JA mismatch is logged too
+    expect(logs.filter((l) => /^M6-09[89]: name_ja differs/.test(l))).toHaveLength(2);
     expect(named("M6")).toEqual([["M6-098", null], ["M6-099", null], ["M6-010", "Team Rocket's Mewtwo ex"], ["M6-011", "Zacian V"]]);
     expect(logs.filter((l) => /^(XY2-055|M6-098|M6-099) /.test(l))).toHaveLength(3);
     expect(logs.some((l) => l.startsWith("set B: boom"))).toBe(true);
