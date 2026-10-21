@@ -13,6 +13,7 @@ import { pricesJob } from "./jobs/prices";
 import { pricechartingCsvJob } from "./jobs/pricecharting-csv";
 import { pricechartingLinkJob } from "./jobs/pricecharting-link";
 import { estimatesJob } from "./jobs/estimates";
+import { slabsJob } from "./jobs/slabs";
 
 const [name, ...flags] = process.argv.slice(2);
 const jobs = {
@@ -24,6 +25,7 @@ const jobs = {
   "ebay:sold": ebaySold,
   "yahoo:auctions": yahooAuctionsJob,
   "ebay:sold-comps": soldCompsJob,
+  "slabs": slabsJob({ all: flags.includes("--all") }),
   match: matchJob({ all: flags.includes("--all") }),
   prices: pricesJob,
   "pricecharting:csv": pricechartingCsvJob(),

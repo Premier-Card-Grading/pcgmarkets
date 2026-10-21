@@ -11,3 +11,4 @@ supabase/.temp/
 coverage/
 *.tsbuildinfo
 spikes/out/
+apps/ingest/.cache/

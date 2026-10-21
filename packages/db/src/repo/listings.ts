@@ -1,6 +1,7 @@
 import type { Db } from "../client";
 import { must } from "../client";
-import type { RawListing } from "@pcg/domain";
+import type { EbayMetadata, RawListing } from "@pcg/domain";
+import { selectAll } from "../paginate";
 import { stripSellerFields } from "../strip-seller";
 
 export async function upsertRawListings(db: Db, listings: RawListing[]): Promise<{ inserted: number; updated: number }> {
@@ -23,4 +24,18 @@ export async function upsertRawListings(db: Db, listings: RawListing[]): Promise
       .eq("source", r.source).eq("source_item_id", r.source_item_id));
   }
   return { inserted: fresh.length, updated: stale.length };
+}
+
+export interface SlabWork { id: string; sourceItemId: string; imageUrls: string[]; soldAt: string | null; metadata: EbayMetadata }
+
+/** SoldComps sales whose slab photo hasn't been read yet (metadata.pcg unset), or all of them. */
+export async function loadSlabWork(db: Db, opts: { all: boolean }): Promise<SlabWork[]> {
+  const rows = await selectAll<{ id: string; source_item_id: string; image_urls: string[] | null; sold_at: string | null; metadata: EbayMetadata | null }>((f, t) =>
+    db.from("raw_listings").select("id,source_item_id,image_urls,sold_at,metadata").eq("source", "soldcomps").order("id").range(f, t));
+  return rows.filter((r) => opts.all || r.metadata?.pcg == null)
+    .map((r) => ({ id: r.id, sourceItemId: r.source_item_id, imageUrls: r.image_urls ?? [], soldAt: r.sold_at, metadata: r.metadata ?? {} }));
+}
+
+export async function saveSlabFinding(db: Db, id: string, metadata: EbayMetadata) {
+  must(await db.from("raw_listings").update({ metadata }).eq("id", id));
 }

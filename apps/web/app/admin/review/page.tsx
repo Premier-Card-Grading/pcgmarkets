@@ -1,11 +1,11 @@
 import { serviceClient } from "@/lib/supabase-server";
 import { ReviewList } from "@/components/ReviewList";
 import { ChipLink } from "@/components/Chip";
-import { reasonLabel, reasonFilterKey, type ReviewItemData } from "@/lib/review";
+import { reasonLabel, reasonFilterKey, REVIEW_REASON_KEYS, type ReviewItemData } from "@/lib/review";
 
 export const dynamic = "force-dynamic";
 
-const KNOWN_REASONS = ["no_card_number", "ambiguous_set", "no_grade", "lot", "grader_missing", "ambiguous_grader", "no_set_code", "no_metadata"];
+const KNOWN_REASONS = REVIEW_REASON_KEYS;
 
 export default async function Review({ searchParams }: { searchParams: Promise<{ reason?: string }> }) {
   const { reason } = await searchParams;

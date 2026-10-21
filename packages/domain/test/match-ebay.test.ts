@@ -67,10 +67,13 @@ describe("matchEbay", () => {
 
 describe("matchListing dispatch", () => {
   it("routes by source", () => {
-    expect(MATCHER_VERSION).toBe("3");
+    expect(MATCHER_VERSION).toBe("4");
     const jp = matchListing({ source: "yahoo_auc", title: "SV1a 073/073 PCG10", description: null, metadata: {}, cert: null }, catalog);
     expect(jp.matchMethod).toBe("jp_set_code");
     const eb = matchListing({ source: "thecardapi", title: "x", description: null, metadata: { grader: PCG, grade: "10", set: "OBF", cardNumber: "201" }, cert: null }, catalog);
     expect(eb.matchMethod).toBe("ebay_metadata");
+    // A SoldComps sale is never matched from its title, even one naming the set and number.
+    const sc = matchListing({ source: "soldcomps", title: "Pokemon PCG 10 OBF 201/197", description: null, metadata: {}, cert: null }, catalog);
+    expect(sc).toMatchObject({ state: "needs_review", reviewReason: "no_cert" });
   });
 });

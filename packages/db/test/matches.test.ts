@@ -12,8 +12,9 @@ interface FakeRawListingRow {
 }
 
 function fakeDb(rows: FakeRawListingRow[]): Db {
+  const page = (from: number, to: number) => Promise.resolve({ data: rows.slice(from, to + 1), error: null });
   return {
-    from: () => ({ select: async () => ({ data: rows, error: null }) }),
+    from: () => ({ select: () => ({ order: () => ({ range: page }) }) }),
   } as unknown as Db;
 }
 
@@ -56,5 +57,10 @@ describe("loadListingsToMatch", () => {
     const [result] = await loadListingsToMatch(db, { all: false });
     expect(result).not.toHaveProperty("listing_matches");
     expect(result).toEqual({ id: "new-1", source: "ebay:sold", title: "listing new-1", description: null, metadata: {} });
+  });
+
+  it("reads past Supabase's 1000-row cap", async () => {
+    const db = fakeDb(Array.from({ length: 1500 }, (_, i) => row(`r-${i}`, null)));
+    expect(await loadListingsToMatch(db, { all: true })).toHaveLength(1500);
   });
 });

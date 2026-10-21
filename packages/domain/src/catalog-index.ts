@@ -17,6 +17,8 @@ export interface ProductRef {
   numberDenom: number | null;
   numberSuffix: string | null;
   language: Language;
+  numberPrinted?: string;
+  nameEn?: string | null;
 }
 
 export interface CatalogIndex {
@@ -29,9 +31,15 @@ export interface CatalogIndex {
   findSetsInText(text: string): SetRef[];
   productsBySetAndNumber(setId: string, num: number): ProductRef[];
   productsBySuffixAndNumber(suffix: string, num: number, language: Language): ProductRef[];
+  /** Every product in a language with this number, across all sets (PCG cert resolution). */
+  productsByLanguageAndNumber(language: Language, num: number): ProductRef[];
+  /** Products whose printed number is exactly this (case/space-insensitive), e.g. "XY141". */
+  productsByPrinted(language: Language, printed: string): ProductRef[];
+  set(id: string): SetRef | undefined;
 }
 
 const norm = (s: string) => s.trim().toLowerCase();
+const printedKey = (s: string) => s.toLowerCase().replace(/[\s-]+/g, "");
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** Short names/aliases (e.g. bare numeric aliases like "151") are too noise-prone for free-text scanning. */
 const MIN_NAME_LEN_FOR_TEXT_SCAN = 4;
@@ -42,11 +50,15 @@ export class InMemoryCatalog implements CatalogIndex {
   private byName = new Map<string, SetRef[]>();
   private bySetNum = new Map<string, ProductRef[]>();
   private bySuffixNum = new Map<string, ProductRef[]>();
+  private byLangNum = new Map<string, ProductRef[]>();
+  private byPrinted = new Map<string, ProductRef[]>();
+  private setsById = new Map<string, SetRef>();
   private codes: Record<Language, string[]> = { ja: [], en: [] };
 
   constructor(sets: SetRef[], products: ProductRef[]) {
     const push = <K, V>(m: Map<K, V[]>, k: K, v: V) => m.set(k, [...(m.get(k) ?? []), v]);
     for (const s of sets) {
+      this.setsById.set(s.id, s);
       if (s.printedCode) {
         push(this.byCode, `${s.language}:${norm(s.printedCode)}`, s);
         this.codes[s.language].push(s.printedCode);
@@ -55,7 +67,9 @@ export class InMemoryCatalog implements CatalogIndex {
       for (const n of [s.nameEn, s.nameJa, ...s.aliases]) if (n) push(this.byName, norm(n), s);
     }
     for (const p of products) {
+      if (p.numberPrinted) push(this.byPrinted, `${p.language}:${printedKey(p.numberPrinted)}`, p);
       if (p.numberNum == null) continue;
+      push(this.byLangNum, `${p.language}:${p.numberNum}`, p);
       push(this.bySetNum, `${p.setId}:${p.numberNum}`, p);
       if (p.numberSuffix) push(this.bySuffixNum, `${p.language}:${norm(p.numberSuffix)}:${p.numberNum}`, p);
     }
@@ -77,4 +91,7 @@ export class InMemoryCatalog implements CatalogIndex {
   productsBySuffixAndNumber(suffix: string, num: number, language: Language) {
     return this.bySuffixNum.get(`${language}:${norm(suffix)}:${num}`) ?? [];
   }
+  productsByLanguageAndNumber(language: Language, num: number) { return this.byLangNum.get(`${language}:${num}`) ?? []; }
+  productsByPrinted(language: Language, printed: string) { return this.byPrinted.get(`${language}:${printedKey(printed)}`) ?? []; }
+  set(id: string) { return this.setsById.get(id); }
 }

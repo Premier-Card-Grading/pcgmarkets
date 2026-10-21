@@ -3,8 +3,8 @@ import type { Connector, Page } from "../types";
 import { politeFetch } from "../http";
 import { SOLDCOMPS } from "./schema";
 
-/** Free tier is 100 req/mo — cap pages fetched per keyword per sweep. */
-export const PAGE_CAP = 3;
+/** Free tier is 100 req/mo — cap pages fetched per site per sweep (eBay itself stops at 7 pages of 240). */
+export const PAGE_CAP = 8;
 
 const str = (v: unknown): string | undefined => (v == null || v === "" ? undefined : String(v));
 
@@ -13,13 +13,23 @@ export function extractItems(body: unknown): unknown[] {
   return Array.isArray(items) ? items : [];
 }
 
-export function toRawListing(item: unknown): RawListing | null {
+/** Where the seller is: the item's own location, or for a domestic-only site, that site's country. */
+export function sellerLocation(item: Record<string, unknown>, site?: string): string | null {
+  return str(item.itemLocation) ?? (site ? SOLDCOMPS.siteOptions[site]?.country ?? null : null);
+}
+
+export function toRawListing(item: unknown, site?: string): RawListing | null {
   if (!item || typeof item !== "object") return null;
   const r = item as Record<string, unknown>;
   const itemId = str(r.itemId);
   const title = str(r.title);
   const endedAtRaw = str(r.endedAt);
-  const price = Number(r.soldPrice);
+  // A Best Offer sale lists the asking price as soldPrice; the accepted price is boaAcceptedPrice
+  // (hydrateBoa). Without it the real price is unknown, so the sale is flagged and kept out of prices.
+  const bestOffer = r.bestOfferAccepted === true;
+  const accepted = Number(r.boaAcceptedPrice);
+  const acceptedKnown = bestOffer && r.boaAcceptedPrice != null && Number.isFinite(accepted) && accepted > 0;
+  const price = acceptedKnown ? accepted : Number(r.soldPrice);
   if (!itemId || !title || !endedAtRaw || !Number.isFinite(price) || price <= 0) return null;
   const endedAt = new Date(endedAtRaw);
   if (Number.isNaN(endedAt.getTime())) return null;
@@ -35,11 +45,12 @@ export function toRawListing(item: unknown): RawListing | null {
     kind: "sold",
     soldAt: endedAtIso,
     endedAt: endedAtIso,
-    isBestOffer: false,
-    sellerCountry: null,
+    isBestOffer: bestOffer && !acceptedKnown,
+    sellerCountry: sellerLocation(r, site),
     externalItemId: itemId,
-    imageUrls: [],
-    // Title-only source: no structured grader/grade/set/cardNumber/language fields.
+    imageUrls: [str(r.fullResThumbnailUrl) ?? str(r.thumbnailUrl)].filter((u): u is string => u != null),
+    // No structured grader/grade/set/cardNumber fields: the card is identified from the PCG cert
+    // found via the slab photo (certs job), never from the seller's title.
     metadata: {},
     // Full vendor payload, including seller PII (username, feedback score, positive %) — all
     // seller* fields except sellerCountry are stripped at the DB insert layer (stripSellerFields),
@@ -47,6 +58,9 @@ export function toRawListing(item: unknown): RawListing | null {
     raw: item,
   };
 }
+
+/** Sellers in China (the unrelated Chinese "PCG") and sellers of unknown location are dropped. */
+export const keepSeller = (location: string | null) => location != null && !SOLDCOMPS.excludedSellerLocations.includes(location);
 
 export interface SoldCompsCursor { siteIndex: number; page: number; seenIds: string[] }
 
@@ -60,6 +74,8 @@ export function buildScrapeUrl(site: string, page: number): URL {
   u.searchParams.set("sortOrder", SOLDCOMPS.sortOrder);
   u.searchParams.set("page", String(page));
   u.searchParams.set("count", String(SOLDCOMPS.count));
+  u.searchParams.set("itemLocation", SOLDCOMPS.siteOptions[site]?.itemLocation ?? "domestic");
+  if (SOLDCOMPS.hydrateBoa) u.searchParams.set("hydrateBoa", "true");
   return u;
 }
 
@@ -97,7 +113,7 @@ export const soldComps: Connector = {
         : { siteIndex, page: page + 1, seenIds: [...seen].slice(-5000) };
 
       yield {
-        listings: fresh.map(toRawListing).filter((l): l is RawListing => l !== null),
+        listings: fresh.map((it) => toRawListing(it, site)).filter((l): l is RawListing => l !== null && keepSeller(l.sellerCountry)),
         nextCursor: next,
         suspect: items.length === 0 && page === 1,
       };

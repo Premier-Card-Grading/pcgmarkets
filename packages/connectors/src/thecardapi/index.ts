@@ -26,7 +26,7 @@ export function toRawListing(rec: unknown): RawListing | null {
   const soldAt = new Date(soldAtRaw);
   if (Number.isNaN(soldAt.getTime())) return null;
   const metadata: EbayMetadata = {};
-  const md: Array<[keyof EbayMetadata, string]> = [["grader", f.grader], ["grade", f.grade], ["certNumber", f.certNumber], ["set", f.set], ["cardNumber", f.cardNumber], ["language", f.language]];
+  const md: Array<[Exclude<keyof EbayMetadata, "pcg">, string]> = [["grader", f.grader], ["grade", f.grade], ["certNumber", f.certNumber], ["set", f.set], ["cardNumber", f.cardNumber], ["language", f.language]];
   for (const [k, path] of md) { const v = str(get(rec, path)); if (v) metadata[k] = v; }
   const imgs = get(rec, f.imageUrls);
   // Conservative default: treat any raw value matching THECARDAPI.bestOfferValues as a best-offer

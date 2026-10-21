@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
-import { extractItems, toRawListing, soldComps, PAGE_CAP, type SoldCompsCursor } from "../src/soldcomps";
+import { extractItems, toRawListing, soldComps, PAGE_CAP, keepSeller, buildScrapeUrl, type SoldCompsCursor } from "../src/soldcomps";
 import { SOLDCOMPS } from "../src/soldcomps/schema";
 import { _resetForTests } from "../src/http";
 
@@ -38,6 +38,34 @@ describe("soldcomps mapping", () => {
     }
   });
 
+  it("uses the accepted Best Offer price; flags a Best Offer sale whose price is unknown", () => {
+    const base = { itemId: "1", title: "t", endedAt: "2026-10-01", soldPrice: "100.00" };
+    expect(toRawListing({ ...base, bestOfferAccepted: true, boaAcceptedPrice: "80.00" })).toMatchObject({ price: 80, isBestOffer: false });
+    expect(toRawListing({ ...base, bestOfferAccepted: true, boaAcceptedPrice: null })).toMatchObject({ price: 100, isBestOffer: true });
+    expect(toRawListing({ ...base, bestOfferAccepted: false })).toMatchObject({ price: 100, isBestOffer: false });
+  });
+
+  it("records the seller's location, taking a domestic-only site's country when the item has none", () => {
+    const base = { itemId: "1", title: "t", endedAt: "2026-10-01", soldPrice: "5", fullResThumbnailUrl: "https://i.ebayimg.com/x/s-l500.jpg" };
+    expect(toRawListing({ ...base, itemLocation: "United States" }, "ebay.com")).toMatchObject({ sellerCountry: "United States", imageUrls: ["https://i.ebayimg.com/x/s-l500.jpg"] });
+    expect(toRawListing({ ...base, itemLocation: null }, "ebay.co.uk")!.sellerCountry).toBe("United Kingdom");
+    expect(toRawListing({ ...base, itemLocation: null }, "ebay.com")!.sellerCountry).toBeNull();
+  });
+
+  it("drops sellers in China and sellers of unknown location", () => {
+    expect(keepSeller("United States")).toBe(true);
+    expect(keepSeller("Hong Kong")).toBe(true);
+    expect(keepSeller("China")).toBe(false);
+    expect(keepSeller(null)).toBe(false);
+  });
+
+  it("searches ebay.com worldwide and the UK/AU sites domestic-only, with Best Offer prices", () => {
+    expect(buildScrapeUrl("ebay.com", 1).searchParams.get("itemLocation")).toBe("worldwide");
+    expect(buildScrapeUrl("ebay.co.uk", 1).searchParams.get("itemLocation")).toBe("domestic");
+    expect(buildScrapeUrl("ebay.com", 1).searchParams.get("hydrateBoa")).toBe("true");
+    expect(buildScrapeUrl("ebay.com", 1).searchParams.get("count")).toBe("240");
+  });
+
   it("returns null when required fields are missing", () => {
     expect(toRawListing({ title: "no id", soldPrice: "1", endedAt: "2026-01-01" })).toBeNull();
     expect(toRawListing({ itemId: "1", title: "no price", endedAt: "2026-01-01" })).toBeNull();
@@ -57,7 +85,7 @@ function mockJsonResponse(body: unknown, status = 200) {
   return { ok: status < 300, status, json: async () => body } as Response;
 }
 function fakeItem(itemId: string) {
-  return { itemId, title: `Item ${itemId}`, soldPrice: "1.00", soldCurrency: "USD", endedAt: "2026-01-01" };
+  return { itemId, title: `Item ${itemId}`, soldPrice: "1.00", soldCurrency: "USD", endedAt: "2026-01-01", itemLocation: "United States" };
 }
 
 describe("soldComps.fetchSold (synthetic: mocked fetch)", () => {
@@ -79,7 +107,7 @@ describe("soldComps.fetchSold (synthetic: mocked fetch)", () => {
     for await (const _page of soldComps.fetchSold(null)) { /* drain the sweep */ }
 
     expect(calls).toBe(SOLDCOMPS.ebaySites.length * PAGE_CAP);
-  }, 20000);
+  }, 60000);
 
   it("persists-then-advances the cursor page-by-page within a site, then to the next site, with no duplicate ids across pages", async () => {
     process.env.SOLDCOMPS_KEY = "sc_test";

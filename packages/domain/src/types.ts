@@ -10,6 +10,8 @@ export interface EbayMetadata {
   set?: string;           // "Obsidian Flames", "SV1a Triplet Beat"
   cardNumber?: string;    // "201/165" | "201"
   language?: string;      // "Japanese" | "English"
+  /** SoldComps: what the slab photo + PCG cert API found (see pcg-slab.ts). */
+  pcg?: import("./pcg-slab").SlabFinding;
 }
 
 export interface RawListing {
@@ -47,7 +49,10 @@ export type MatchMethod = "ebay_metadata" | "cert" | "jp_set_code" | "jp_number_
 export type ReviewReason =
   | "no_card_number" | "no_set_code" | "ambiguous_set" | "no_grade" | "no_metadata"
   | "grader_missing" | "possible_pcg_set_code" | "possible_pcgs" | "lot" | "grader_not_pcg"
-  | "ambiguous_grader" | "other";
+  | "ambiguous_grader" | "other"
+  // SoldComps sales, identified from the slab photo + PCG's cert API (pcg-slab.ts):
+  | "no_cert" | "not_premier_pcg" | "cert_not_found" | "cert_language_not_in_catalogue"
+  | "cert_card_not_in_catalogue" | "cert_grade_unknown";
 
 export interface MatchResult {
   state: MatchState;

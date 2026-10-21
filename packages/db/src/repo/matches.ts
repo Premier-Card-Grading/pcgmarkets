@@ -1,14 +1,16 @@
 import type { Db } from "../client";
 import { must } from "../client";
+import { selectAll } from "../paginate";
 import type { EbayMetadata, MatchResult, Source } from "@pcg/domain";
 
 export interface ListingToMatch { id: string; source: Source; title: string; description: string | null; metadata: EbayMetadata | Record<string, never> }
 export interface MatchRow extends MatchResult { rawListingId: string; matcherVersion: string }
 
 export async function loadListingsToMatch(db: Db, opts: { all: boolean }): Promise<ListingToMatch[]> {
-  const base = db.from("raw_listings").select("id,source,title,description,metadata,listing_matches(state,is_override)");
   type EmbeddedMatch = { state: string; is_override: boolean };
-  const rows = must(await base) as Array<ListingToMatch & { listing_matches: EmbeddedMatch | EmbeddedMatch[] | null }>;
+  // Paged: a plain select stops at Supabase's 1000-row cap.
+  const rows = await selectAll<ListingToMatch & { listing_matches: EmbeddedMatch | EmbeddedMatch[] | null }>((f, t) =>
+    db.from("raw_listings").select("id,source,title,description,metadata,listing_matches(state,is_override)").order("id").range(f, t));
   return rows.filter((r) => {
     // PostgREST embeds a to-one relation (raw_listing_id is unique on listing_matches) as a single
     // object, not an array — but also tolerate an array shape in case that ever changes.

@@ -9,7 +9,13 @@ const LABELS: Record<string, string> = {
   ambiguous_grader: "Grader unclear",
   no_set_code: "No set code",
   no_metadata: "No metadata",
+  no_cert: "No PCG cert found",
+  cert_not_found: "Label not in PCG's certs",
+  cert_language_not_in_catalogue: "Cert language not in catalogue",
+  cert_card_not_in_catalogue: "Cert card not in catalogue",
+  cert_grade_unknown: "Cert grade unclear",
 };
+export const REVIEW_REASON_KEYS = Object.keys(LABELS);
 export const reasonLabel = (r: string | null | undefined) => (r && LABELS[r]) || "Other";
 export const reasonFilterKey = (r: string | null | undefined) => (r && LABELS[r] ? r : "other");
 
@@ -20,6 +26,17 @@ export const reasonFilterKey = (r: string | null | undefined) => (r && LABELS[r]
 export function extractedRows(x: Record<string, unknown>): { label: string; value: string | null; missing?: string }[] {
   const row = (label: string, v: unknown, missing: string) =>
     v == null || v === "" ? { label, value: null, missing } : { label, value: String(v) };
+  // SoldComps sales: what the slab photo and PCG's cert API gave (packages/domain/src/pcg-slab.ts).
+  if (x.pcg && typeof x.pcg === "object") {
+    const f = x.pcg as { status: string; label?: { name: string; set: string; grades: number[] }; certs?: { id: string; num: string | null }[] };
+    return [
+      row("Slab", f.status.replace(/_/g, " "), "not read"),
+      row("Label card", f.label?.name, "not read"),
+      row("Label set", f.label?.set, "not read"),
+      row("Label grades", f.label?.grades?.join(", "), "not read"),
+      row("Cert", f.certs?.map((c) => `${c.id} (${c.num ?? "?"})`).join(", "), "none"),
+    ];
+  }
   return [
     row("Grader", x.grader, "not stated"),
     row("Grade", x.grade, "not stated"),

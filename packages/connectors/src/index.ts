@@ -5,7 +5,7 @@ export * from "./yahoo-auctions";
 export * from "./yahoo-auctions/parse";
 export * from "./thecardapi";
 export { THECARDAPI } from "./thecardapi/schema";
-export { soldComps, extractItems, PAGE_CAP } from "./soldcomps";
+export { soldComps, extractItems, toRawListing, keepSeller, PAGE_CAP } from "./soldcomps";
 export type { SoldCompsCursor } from "./soldcomps";
 export { SOLDCOMPS } from "./soldcomps/schema";
 export * from "./fx";
