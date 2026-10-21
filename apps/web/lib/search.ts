@@ -16,7 +16,7 @@ async function hydrate(db: SupabaseClient, hits: { id: string; sale_count: numbe
   const byId = new Map((products ?? []).map((p: Record<string, unknown>) => [p.id as string, p]));
   return hits.flatMap((h) => {
     const p = byId.get(h.id) as { name_en: string | null; name_ja: string | null; number_printed: string; language: "ja" | "en"; image_url: string | null; sets: { name_en: string | null; name_ja: string | null; printed_code: string | null } } | undefined;
-    if (!p) return [];
+    if (!p || !p.image_url) return []; // cards without an image are hidden from the site
     return [{ id: h.id, nameEn: p.name_en, nameJa: p.name_ja, setName: p.sets?.name_en ?? p.sets?.name_ja ?? "", setCode: p.sets?.printed_code ?? null, numberPrinted: p.number_printed, language: p.language, imageUrl: p.image_url,
       grades: { g10: peek.get(`${h.id}|10`) ?? null, g95: peek.get(`${h.id}|9.5`) ?? null, g9: peek.get(`${h.id}|9`) ?? null }, saleCount: h.sale_count }];
   });

@@ -13,7 +13,8 @@ export interface CardPageData {
 
 export async function loadCard(db: SupabaseClient, id: string): Promise<CardPageData | null> {
   const { data: product } = await db.from("products").select("id,name_en,name_ja,number_printed,language,image_url,rarity,sets(id,name_en,name_ja,printed_code,release_date,card_count)").eq("id", id).maybeSingle();
-  if (!product) return null;
+  // Cards without an image are hidden from the site.
+  if (!product || !(product as { image_url: string | null }).image_url) return null;
   const [{ data: points }, { data: sales }, { data: estimates }] = await Promise.all([
     db.from("price_points").select("*").eq("product_id", id),
     db.from("public_sales").select("id,grade_value,grade_label,price,currency,price_usd,sold_at,source,url,is_best_offer").eq("product_id", id).order("sold_at", { ascending: false }).limit(500),

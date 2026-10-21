@@ -12,7 +12,7 @@ function fakeDb(respond: (c: Chain) => Res) {
       const chain: Chain = { table, calls: [] };
       chains.push(chain);
       const b: Record<string, unknown> = {};
-      for (const m of ["select", "eq", "order", "range", "maybeSingle"]) b[m] = (...args: unknown[]) => { chain.calls.push([m, args]); return b; };
+      for (const m of ["select", "eq", "not", "order", "range", "maybeSingle"]) b[m] = (...args: unknown[]) => { chain.calls.push([m, args]); return b; };
       b.then = (ok: (v: unknown) => unknown, bad: (e: unknown) => unknown) => Promise.resolve(respond(chain)).then(ok, bad);
       return b;
     },
@@ -40,5 +40,23 @@ describe("loadSetPage", () => {
     expect(page!.set.saleCount).toBe(7);
     const sales = chains.find((c) => c.table === "set_sale_counts")!;
     expect(sales.calls).toContainEqual(["eq", ["id", "SV4a"]]);
+  });
+});
+
+describe("cards without an image are hidden", () => {
+  const hides = (c: Chain, col: string) => c.calls.some(([m, a]) => m === "not" && a[0] === col && a[1] === "is" && a[2] === null);
+  it("index counts only cards with an image and drops sets left with none", async () => {
+    const empty = { ...setRow, id: "PMCG1", products: [{ count: 0 }] };
+    const { db, chains } = fakeDb((c) => (c.table === "set_sale_counts" ? { data: [], error: null } : isHead(c) ? { count: 1, error: null } : { data: [setRow, empty], error: null }));
+    const idx = await loadSetsIndex(db, "ja");
+    expect(idx.groups.flatMap((g) => g.sets.map((t) => t.id))).toEqual(["SV4a"]);
+    for (const c of chains.filter((c) => c.table === "sets")) expect(hides(c, "products.image_url")).toBe(true);
+  });
+  it("set page shows only cards with an image, and no page for a set with none", async () => {
+    const { db, chains } = fakeDb((c) => (c.table === "set_sale_counts" ? { data: [], error: null } : c.table === "sets" ? { data: setRow, error: null } : { data: [], error: null }));
+    await loadSetPage(db, "SV4a");
+    expect(hides(chains.find((c) => c.table === "public_set_cards")!, "image_url")).toBe(true);
+    const none = fakeDb((c) => (c.table === "sets" ? { data: { ...setRow, products: [{ count: 0 }] }, error: null } : { data: [], error: null }));
+    expect(await loadSetPage(none.db, "SV4a")).toBeNull();
   });
 });

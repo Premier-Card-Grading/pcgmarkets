@@ -59,24 +59,26 @@ async function saleCounts(db: SupabaseClient, id?: string): Promise<Map<string, 
 export async function loadSetsIndex(db: SupabaseClient, lang: Lang) {
   const [sales, rows, en, ja] = await Promise.all([
     saleCounts(db),
-    db.from("sets").select(SET_COLS).eq("language", lang).order("release_date", { ascending: false }).order("id").range(0, 999),
-    db.from("sets").select("id", { count: "exact", head: true }).eq("language", "en"),
-    db.from("sets").select("id", { count: "exact", head: true }).eq("language", "ja"),
+    db.from("sets").select(SET_COLS).eq("language", lang).not("products.image_url", "is", null).order("release_date", { ascending: false }).order("id").range(0, 999),
+    db.from("sets").select("id,products!inner(id)", { count: "exact", head: true }).eq("language", "en").not("products.image_url", "is", null),
+    db.from("sets").select("id,products!inner(id)", { count: "exact", head: true }).eq("language", "ja").not("products.image_url", "is", null),
   ]);
   for (const r of [rows, en, ja]) if (r.error) throw new Error(r.error.message);
-  const tiles = ((rows.data ?? []) as unknown as SetDbRow[]).map((r) => toTile(r, sales));
+  // Cards without an image are hidden from the site, and so is a set left with none.
+  const tiles = ((rows.data ?? []) as unknown as SetDbRow[]).map((r) => toTile(r, sales)).filter((t) => t.hasCards);
   return { groups: groupBySeries(tiles), counts: { en: en.count ?? 0, ja: ja.count ?? 0 } };
 }
 
 export async function loadSetPage(db: SupabaseClient, id: string) {
-  const { data: row, error } = await db.from("sets").select(SET_COLS).eq("id", id).maybeSingle();
+  const { data: row, error } = await db.from("sets").select(SET_COLS).eq("id", id).not("products.image_url", "is", null).maybeSingle();
   if (error) throw new Error(error.message);
   if (!row) return null;
   const r = row as unknown as SetDbRow;
+  if (!(r.products?.[0]?.count)) return null;
   const sales = await saleCounts(db, id);
   const cards: SetCard[] = [];
   for (let from = 0; ; from += 1000) {
-    const { data, error: e } = await db.from("public_set_cards").select("*").eq("set_id", id).order("number_num", { ascending: true, nullsFirst: false }).order("id").range(from, from + 999);
+    const { data, error: e } = await db.from("public_set_cards").select("*").eq("set_id", id).not("image_url", "is", null).order("number_num", { ascending: true, nullsFirst: false }).order("id").range(from, from + 999);
     if (e) throw new Error(e.message);
     cards.push(...((data ?? []) as SetCard[]));
     if ((data ?? []).length < 1000) break;
