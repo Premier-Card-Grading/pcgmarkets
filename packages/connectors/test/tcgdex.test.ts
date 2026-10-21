@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { toSetRow, toProductRows, isDigitalOnly, catalogSetId, supplementSetRow, JA_SUPPLEMENT_SETS, isMislabelledJa, isEmptyJaDuplicate, seriesFor, logoFor, withoutLimitlessOwned, type TcgdexSet } from "../src/tcgdex";
+import { toSetRow, toProductRows, isDigitalOnly, catalogSetId, supplementSetRow, JA_SUPPLEMENT_SETS, isMislabelledJa, isEmptyJaDuplicate, seriesFor, logoFor, type TcgdexSet } from "../src/tcgdex";
 import ja from "./fixtures/tcgdex-set-SV1a.json";
 import en from "./fixtures/tcgdex-set-sv04.5.json";
 
@@ -69,10 +69,6 @@ describe("tcgdex mapping", () => {
   });
   it("tags TCGdex images with their source", () => {
     expect(toProductRows("ja", ja as TcgdexSet)[0]!.image_source).toBe("tcgdex");
-  });
-  it("strips Limitless-owned fields", () => {
-    const row = { id: "x", name_en: "A", rarity: "R", image_url: "u", image_source: "limitless", series: "S", logo_url: "l", name_ja: "ja" };
-    expect(withoutLimitlessOwned(row, "product")).toEqual({ id: "x", name_ja: "ja" });
   });
   it("flags empty SM+ duplicates under ja only", () => {
     for (const id of ["SM1+", "sm2+", "SM5+"]) expect(isEmptyJaDuplicate("ja", id)).toBe(true);

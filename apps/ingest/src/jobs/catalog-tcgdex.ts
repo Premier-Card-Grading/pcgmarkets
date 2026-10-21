@@ -4,15 +4,21 @@ import { resolveCardNameEn } from "@pcg/domain";
 import { upsertSets, upsertProducts, loadLimitlessOwnedSetIds, loadSetProducts, type ProductRow } from "@pcg/db";
 
 /** JA rows on TCGdex-owned sets: dictionary name, else the stored one; a stored name is only dropped with a logged reason. */
-async function withStoredNames(db: Parameters<Job>[0]["db"], log: (m: string) => void, setId: string, series: string | null, rows: ProductRow[]): Promise<ProductRow[]> {
-  const stored = new Map((await loadSetProducts(db, setId)).map((p) => [p.id, p.name_en]));
+function withStoredNames(log: (m: string) => void, stored: Map<string, ProductRow>, series: string | null, rows: ProductRow[]): ProductRow[] {
   return rows.map((r) => {
-    const previous = stored.get(r.id) ?? null;
+    const previous = stored.get(r.id)?.name_en ?? null;
     const res = resolveCardNameEn({ nameJa: r.name_ja, limitlessEn: null, series, previous });
     if (res.note) log(`${r.id} ${r.name_ja ?? ""}: name_en ${JSON.stringify(previous)} -> ${JSON.stringify(res.nameEn)}: ${res.note}`);
     return { ...r, name_en: res.nameEn };
   });
 }
+
+/** C1: TCGdex has no image -> keep the stored one (pokemontcg.io from images:en). Keys stay on every row: a batch upsert nulls missing keys. */
+const withStoredImages = (stored: Map<string, ProductRow>, rows: ProductRow[]): ProductRow[] =>
+  rows.map((r) => {
+    const old = stored.get(r.id);
+    return r.image_url == null && old?.image_url != null ? { ...r, image_url: old.image_url, image_source: old.image_source ?? null } : r;
+  });
 
 export const catalogTcgdex: Job = async ({ db, log }) => {
   let sets = 0, products = 0, skipped = 0;
@@ -27,10 +33,17 @@ export const catalogTcgdex: Job = async ({ db, log }) => {
       if (tcgdex.isDigitalOnly(full)) { skipped += 1; continue; }
       const id = tcgdex.catalogSetId(lang, full.id, enIds);
       const setRow = tcgdex.toSetRow(lang, full, id);
-      await upsertSets(db, [owned.has(id) ? tcgdex.withoutLimitlessOwned(setRow, "set") : setRow]);
+      const stored = new Map((await loadSetProducts(db, id)).map((p) => [p.id, p]));
       let rows = tcgdex.toProductRows(lang, full, id);
-      if (lang === "ja" && !owned.has(id)) rows = await withStoredNames(db, log, id, setRow.series ?? null, rows);
-      await upsertProducts(db, owned.has(id) ? rows.map((r) => tcgdex.withoutLimitlessOwned(r, "product")) : rows);
+      if (owned.has(id)) {
+        // C2: Limitless owns this set row and every stored card on it; TCGdex only adds cards we do not have yet.
+        rows = rows.filter((r) => !stored.has(r.id));
+      } else {
+        await upsertSets(db, [setRow]);
+        if (lang === "ja") rows = withStoredNames(log, stored, setRow.series ?? null, rows);
+        rows = withStoredImages(stored, rows);
+      }
+      await upsertProducts(db, rows);
       sets += 1; products += rows.length;
     }
   }

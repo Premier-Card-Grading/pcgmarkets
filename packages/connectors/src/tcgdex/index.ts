@@ -59,14 +59,6 @@ export function seriesFor(lang: Language, set: TcgdexSet): string | null {
 }
 export const logoFor = (set: TcgdexSet) => (set.logo ? `${set.logo}.png` : null);
 
-const LIMITLESS_OWNED = ["name_en", "rarity", "image_url", "image_source", "series", "logo_url"] as const;
-/** Copy of a row without the fields Limitless owns, so a TCGdex upsert never overwrites them. */
-export function withoutLimitlessOwned<T extends object>(row: T, _kind: "set" | "product"): T {
-  const out = { ...row } as Record<string, unknown>;
-  for (const k of LIMITLESS_OWNED) delete out[k];
-  return out as T;
-}
-
 export function toSetRow(lang: Language, set: TcgdexSet, id = set.id): SetRow {
   const printed = lang === "ja" ? set.id : (set.abbreviation?.official ?? null);
   const official = set.cardCount?.official && set.cardCount.official > 0 ? set.cardCount.official : null;
