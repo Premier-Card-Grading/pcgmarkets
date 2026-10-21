@@ -104,6 +104,10 @@ describe("resolveCardNameEn: Mega Evolution (XY2-055)", () => {
     expect(out.nameEn).toBe("M Charizard-EX");
     expect(out.note).toBeTruthy();
   });
+  it("leaves Primal Reversion alone even though Limitless types it Mega Evolution", () => {
+    expect(r({ nameJa: "ゲンシグラードンEX", limitlessEn: null, type: "F Mega Evolution", series: "XY" })).toBe("Primal Groudon-EX");
+    expect(r({ nameJa: "ゲンシカイオーガEX", limitlessEn: null, type: "W Mega Evolution", previous: "M Primal Kyogre-EX" })).toBe("Primal Kyogre-EX");
+  });
   it("keeps Scarlet & Violet era Mega ex names", () => {
     expect(r({ nameJa: "メガリザードンXex", limitlessEn: "Mega Charizard X ex", type: "R Mega Evolution", series: "Mega" })).toBe("Mega Charizard X ex");
   });

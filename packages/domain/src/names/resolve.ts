@@ -53,10 +53,11 @@ function extendsByTokens(long: string, short: string): boolean {
 const isMegaType = (type: string | null | undefined) => /\bMega Evolution\b/i.test(type ?? "");
 const isPrismHint = (v: string | null | undefined) => /\bPrism Star\b|◇/i.test(v ?? "");
 
-/** XY Mega cards: "Charizard-EX" -> "M Charizard-EX"; already-Mega names stay; anything else is not certain. */
+/** XY Mega cards: "Charizard-EX" -> "M Charizard-EX"; already-Mega and Primal names stay; anything else is not certain. */
 function megaForm(name: string | null): string | null {
   if (name == null) return null;
-  if (/^(M |Mega )/.test(name)) return name;
+  // Limitless also types Primal Reversion as "Mega Evolution"; "Primal Groudon-EX" takes no M.
+  if (/^(M |Mega |Primal )/.test(name)) return name;
   return /-EX$/.test(name) ? `M ${name}` : null;
 }
 const prismForm = (name: string | null) => (name == null || name.endsWith("◇") ? name : `${name} ◇`);
