@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 const state = vi.hoisted(() => ({
   lastOk: null as null | { id: string; fetched_at: string; row_count: number },
   imports: [] as { id: string; status: string; notes: string | null }[],
-  upserted: 0, deletedStale: false, links: [] as unknown[], estimates: [] as unknown[],
+  upserted: 0, deletedStale: false, snapshots: [] as string[], links: [] as unknown[], estimates: [] as unknown[],
   failUpsert: false,
   setMap: null as null | unknown[], pcRows: null as null | unknown[], cands: null as null | unknown[],
   keptPcIds: null as null | string[], consoles: [] as string[], candSets: [] as string[], deletedAuto: 0, linkedForEstimates: null as null | unknown[],
@@ -16,6 +16,7 @@ vi.mock("@pcg/db", () => ({
   finishImport: async (_db: unknown, id: string, status: string, notes: string | null) => { const i = state.imports.find((x) => x.id === id)!; i.status = status; i.notes = notes; },
   upsertPcProducts: async (_db: unknown, _id: string, rows: unknown[]) => { if (state.failUpsert) throw new Error("db down"); state.upserted += rows.length; },
   deleteStalePcProducts: async () => { state.deletedStale = true; },
+  snapshotPcPrices: async (_db: unknown, id: string) => { state.snapshots.push(id); return 2; },
   loadSetMap: async () => state.setMap ?? [{ setId: "sv03.5", consoleName: "Pokemon Scarlet & Violet 151", eraOverride: null, language: "en" }],
   loadPcProductsForConsoles: async (_db: unknown, consoles: string[]) => { state.consoles = consoles; return state.pcRows ?? [
     { pcId: "5001", consoleName: "Pokemon Scarlet & Violet 151", productName: "Blastoise ex #200", cardNumber: "200" },
@@ -41,7 +42,7 @@ const { estimatesJob } = await import("../src/jobs/estimates");
 const csv = readFileSync(new URL("../../../packages/connectors/test/fixtures/pricecharting-sample.csv", import.meta.url), "utf8");
 const ctx = { db: {} as never, log: () => {} };
 
-beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null, keptPcIds: null, consoles: [], candSets: [], deletedAuto: 0, linkedForEstimates: null }); process.env.PRICECHARTING_TOKEN = "t"; });
+beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, snapshots: [], links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null, keptPcIds: null, consoles: [], candSets: [], deletedAuto: 0, linkedForEstimates: null }); process.env.PRICECHARTING_TOKEN = "t"; });
 
 describe("pricecharting:csv", () => {
   it("imports, marks ok only after the upsert, drops stale rows, and links mapped sets", async () => {
@@ -50,6 +51,7 @@ describe("pricecharting:csv", () => {
     expect(state.deletedStale).toBe(true);
     expect(state.imports[0]).toMatchObject({ status: "ok", notes: null });
     expect(stats.suspect).toBeUndefined();
+    expect(state.snapshots).toEqual(["imp1"]); // dated copy kept: PriceCharting serves today's file only
     expect(state.links).toEqual([
       { pc_id: "5001", state: "linked", product_id: "sv03.5-200", review_reason: null },
       { pc_id: "5003", state: "needs_review", product_id: null, review_reason: "variant" },
@@ -61,6 +63,7 @@ describe("pricecharting:csv", () => {
     expect(stats.suspect).toBe(true);
     expect(state.upserted).toBe(0);
     expect(state.deletedStale).toBe(false);
+    expect(state.snapshots).toEqual([]);
   });
   it("is suspect and replaces nothing when too many rows are malformed", async () => {
     const stats = await pricechartingCsvJob({ download: async () => csv.trimEnd() + "\n9999,Extra,Field,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18\n" })(ctx);
@@ -72,6 +75,7 @@ describe("pricecharting:csv", () => {
     state.failUpsert = true;
     await expect(pricechartingCsvJob({ download: async () => csv })(ctx)).rejects.toThrow("db down");
     expect(state.imports[0]!.status).toBe("suspect");
+    expect(state.snapshots).toEqual([]);
   });
   it("fails fast without a token", async () => {
     delete process.env.PRICECHARTING_TOKEN;

@@ -27,6 +27,12 @@ export async function upsertPcProducts(db: Db, importId: string, rows: PcProduct
 export async function deleteStalePcProducts(db: Db, importId: string) {
   must(await db.from("pc_products").delete().neq("import_id", importId));
 }
+/** Keeps a dated copy of mapped cards whose prices changed (pc_price_history). Call after finishImport("ok"). */
+export async function snapshotPcPrices(db: Db, importId: string): Promise<number> {
+  const { data, error } = await db.rpc("snapshot_pc_prices", { p_import: importId });
+  if (error) throw new Error(error.message);
+  return Number(data ?? 0);
+}
 export async function loadSetMap(db: Db) {
   type Row = { set_id: string; console_name: string; era_override: Era | null; sets: { language: "ja" | "en" } | null };
   const rows = await selectAll<Row>((f, t) =>
