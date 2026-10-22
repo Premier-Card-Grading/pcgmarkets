@@ -73,3 +73,32 @@ export function computePricePoints(sales: Sale[], now: Date): PricePoint[] {
   }
   return out;
 }
+
+/** Below this a graded slab "sale" is not a market price: penny-start auctions, retracted or reused listings. */
+export const PRICE_FLOOR_USD = 5;
+/** A sale under this share of the same card and grade's other sales is an outlier. */
+export const OUTLIER_SHARE = 0.25;
+export type PriceFlag = "price_below_floor" | "price_outlier";
+export interface PricedSale { id: string; productId: string; gradeValue: number; priceUsd: number }
+
+/**
+ * Sales to keep out of prices (they go to the review queue, nothing is deleted): any sale under $5, and any sale under
+ * 25% of the median of the same card and grade's other sales when there are at least 2 of them (themselves above $5).
+ */
+export function implausibleSales(sales: PricedSale[]): Map<string, PriceFlag> {
+  const out = new Map<string, PriceFlag>();
+  const groups = new Map<string, PricedSale[]>();
+  for (const s of sales) {
+    if (s.priceUsd < PRICE_FLOOR_USD) { out.set(s.id, "price_below_floor"); continue; }
+    const k = `${s.productId}|${s.gradeValue}`;
+    groups.set(k, [...(groups.get(k) ?? []), s]);
+  }
+  for (const g of groups.values()) {
+    for (const s of g) {
+      const others = g.filter((o) => o !== s).map((o) => o.priceUsd);
+      if (others.length >= 2 && s.priceUsd < OUTLIER_SHARE * median(others)) out.set(s.id, "price_outlier");
+    }
+  }
+  return out;
+}
+

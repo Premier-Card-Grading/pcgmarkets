@@ -52,7 +52,9 @@ export type ReviewReason =
   | "ambiguous_grader" | "other"
   // SoldComps sales, identified from the slab photo + PCG's cert API (pcg-slab.ts):
   | "no_cert" | "not_premier_pcg" | "cert_not_found" | "cert_language_not_in_catalogue"
-  | "cert_card_not_in_catalogue" | "cert_grade_unknown";
+  | "cert_card_not_in_catalogue" | "cert_grade_unknown"
+  // Matched, but the price is not a market price (pricing.ts implausibleSales):
+  | "price_below_floor" | "price_outlier";
 
 export interface MatchResult {
   state: MatchState;

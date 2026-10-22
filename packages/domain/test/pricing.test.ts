@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { median, confidence, computePricePoints, type Sale } from "../src/pricing";
+import { implausibleSales, median, confidence, computePricePoints, type Sale } from "../src/pricing";
 
 const now = new Date("2026-09-06T00:00:00Z");
 const d = (daysAgo: number) => new Date(now.getTime() - daysAgo * 86400000);
@@ -53,3 +53,22 @@ describe("computePricePoints", () => {
     expect(pts.find((p) => p.window === "all")!.lastSoldAt).toEqual(d(2));
   });
 });
+
+describe("implausibleSales", () => {
+  const sale = (id: string, priceUsd: number, productId = "me02.5-219", gradeValue = 9) => ({ id, productId, gradeValue, priceUsd });
+  it("flags sales under $5", () => {
+    expect(implausibleSales([sale("a", 1.25), sale("b", 4.99), sale("c", 5)])).toEqual(new Map([["a", "price_below_floor"], ["b", "price_below_floor"]]));
+  });
+  it("flags a sale under a quarter of the same card and grade's other sales", () => {
+    expect(implausibleSales([sale("a", 12), sale("b", 60), sale("c", 70)])).toEqual(new Map([["a", "price_outlier"]]));
+    expect(implausibleSales([sale("a", 17), sale("b", 60), sale("c", 70)]).size).toBe(0);
+  });
+  it("needs two other sales, of the same grade, to call one an outlier", () => {
+    expect(implausibleSales([sale("a", 12), sale("b", 70)]).size).toBe(0);
+    expect(implausibleSales([sale("a", 12), sale("b", 60, "me02.5-219", 10), sale("c", 70, "me02.5-219", 10)]).size).toBe(0);
+  });
+  it("does not let sub-$5 sales drag the median that outliers are judged against", () => {
+    expect(implausibleSales([sale("a", 10), sale("b", 1), sale("c", 2), sale("d", 3)]).get("a")).toBeUndefined();
+  });
+});
+

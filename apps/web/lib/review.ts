@@ -14,6 +14,8 @@ const LABELS: Record<string, string> = {
   cert_language_not_in_catalogue: "Cert language not in catalogue",
   cert_card_not_in_catalogue: "Cert card not in catalogue",
   cert_grade_unknown: "Cert grade unclear",
+  price_below_floor: "Sold under $5",
+  price_outlier: "Far below this card's other sales",
 };
 export const REVIEW_REASON_KEYS = Object.keys(LABELS);
 export const reasonLabel = (r: string | null | undefined) => (r && LABELS[r]) || "Other";
