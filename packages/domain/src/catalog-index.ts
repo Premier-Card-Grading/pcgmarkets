@@ -8,6 +8,7 @@ export interface SetRef {
   nameEn: string | null;
   nameJa: string | null;
   aliases: string[];
+  releaseDate?: string | null;
 }
 
 export interface ProductRef {
