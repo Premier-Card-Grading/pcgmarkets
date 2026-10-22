@@ -31,7 +31,8 @@ export function parsePsaOcr(input: OcrRow[]): PsaOcrReading | null {
   const edge = Math.min(num.x, cert.x) - 0.03;
   const byY = (a: OcrRow, b: OcrRow) => a.y - b.y;
   const right = band.filter((r) => r.x >= edge || (r.x + r.w > edge + 0.02 && GRADE_WORD.test(r.t.trim().toUpperCase()))).sort(byY);
-  const logo = band.filter((r) => !right.includes(r) && alnum(r) <= 3); // PSA logo fragments, barcode noise
+  // PSA logo fragments ("PSA", "PSAR") and barcode noise.
+  const logo = band.filter((r) => !right.includes(r) && (alnum(r) <= 3 || /^[P5][S5]A[R]?$/i.test(r.t.replace(/[^A-Za-z0-9]/g, ""))));
   const left = band.filter((r) => !right.includes(r) && !logo.includes(r)).sort(byY);
   const grade = right.filter((r) => GRADE.test(r.t.trim()));
   const words = right.filter((r) => r !== num && r !== cert && !GRADE.test(r.t.trim()));

@@ -22,6 +22,10 @@ describe("parsePsaOcr", () => {
     expect(parsePsaOcr(label.map((r, i) => (i === 1 ? { ...r, c: 0.3 } : r)))!.confidence).toBe("low");
     expect(parsePsaOcr([...label, row("GAMESTOP EXCLUSIVE", 0.1, 0.19)])!.confidence).toBe("low");
   });
+  it("drops PSA logo fragments read as a left line", () => {
+    const label = [row("2025 POKEMON DRI EN", 0.1, 0.08), row("ROCKET'S MOLTRES ex", 0.1, 0.11), row("PSAR", 0.4, 0.15), row("#229", 0.8, 0.08), row("10", 0.85, 0.14), row("123456789", 0.7, 0.16)];
+    expect(parsePsaOcr(label)!.labelLeft).toEqual(["2025 POKEMON DRI EN", "ROCKET'S MOLTRES ex"]);
+  });
   it("returns nothing when there is no single PSA number and cert", () => {
     expect(parsePsaOcr([row("PCG", 0.1, 0.05), row("Mega Gengar ex", 0.2, 0.08)])).toBeNull();
   });

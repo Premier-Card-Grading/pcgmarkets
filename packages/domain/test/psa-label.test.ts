@@ -38,6 +38,11 @@ describe("matchPsaLabel", () => {
     expect(matchPsaLabel(read(["2022 POKEMON SWSH", "FA/KINGDRA", "ASTRAL RADIANCE"], "#TG03", "TG03/TG30"), catalog)).toMatchObject({ status: "matched", productId: "swsh10tg-TG03" });
     expect(matchPsaLabel(read(["2000 POKEMON GAME", "CLEFAIRY-HOLO", "BASE II"], "#6", "6/130"), catalog)).toMatchObject({ status: "matched", productId: "base4-6" });
   });
+  it("accepts a rarity line whose first letters the OCR clipped, and Mega/BW rarities", () => {
+    expect(matchPsaLabel(read(["2025 POKEMON DRI EN", "ROCKET'S MOLTRES ex", "LLUSTRATION RARE"], "#229", "229/182"), catalog)).toMatchObject({ status: "matched", productId: "sv10-229" });
+    expect(matchPsaLabel(read(["2025 POKEMON DRI EN", "ROCKET'S MOLTRES ex", "MEGA HYPER RARE"], "#229", "229/182"), catalog)).toMatchObject({ status: "matched" });
+    expect(matchPsaLabel(read(["2025 POKEMON DRI EN", "ROCKET'S MOLTRES ex", "RARE"], "#229", "229/182"), catalog)).toMatchObject({ status: "matched" });
+  });
   it("lets a promo's label year differ from the promo set's release year", () => {
     expect(matchPsaLabel(read(["2024 POKEMON SV-P JP", "PIKACHU", "GYM EVENT CAMPAIGN"], "#197", "197/SV-P"), catalog)).toMatchObject({ status: "matched", productId: "SV-P-197" });
   });

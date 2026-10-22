@@ -57,7 +57,7 @@ const VARIANT = /REV\.? ?FOIL|REVERSE|1ST ED|SHADOWLESS|PRERELEASE|STAMP|ERROR|S
 /** Prefixes and suffixes PSA adds around a card name: "FA/PIKACHU", "DRAGONITE-HOLO", "CELEBI - HOLO". */
 const NAME_DECOR = /^(F\.?A\.?\/|FULL ART\/)|[\s-]+HOLO$/i;
 const RARITY = ["SPECIAL ILLUSTRATION RARE", "ILLUSTRATION RARE", "SPECIAL ART RARE", "ART RARE", "SUPER RARE", "ULTRA RARE", "HYPER RARE", "DOUBLE RARE",
-  "SHINY RARE", "SECRET RARE", "RAINBOW RARE", "BLACK WHITE RARE", "MEGA ATTACK RARE", "SECRET", "FULL ART", "GOLD", "HOLO", "PROMO",
+  "SHINY RARE", "SECRET RARE", "RAINBOW RARE", "BLACK WHITE RARE", "BW RARE", "MEGA ATTACK RARE", "MEGA HYPER RARE", "MEGA ULTRA RARE", "RARE", "SECRET", "FULL ART", "GOLD", "HOLO", "PROMO",
   "SSR", "SAR", "CSR", "CHR", "SR", "UR", "AR", "HR", "RRR", "RR", "FA", "SHINY", "RADIANT", "BLACK STAR"];
 const SERIES = ["SUN & MOON", "S & M", "SWORD & SHIELD", "SWSH", "SCARLET & VIOLET", "XY", "BLACK & WHITE", "D & P", "HG & SS", "POKEMON", "P.M.", "JPN", "JAPANESE"];
 const ROMAN: Record<string, string> = { II: "2", III: "3", IV: "4" };
@@ -88,6 +88,9 @@ function setEvidence(s: SetRef, lines: string[], cardNumber: string | null, p: P
 /** A label line beyond the year/set line is the card name, a rarity, or the set's own name; anything else marks another printing. */
 function plainLine(l: string, s: SetRef, p: ProductRef): boolean {
   if (nameKeys(p).has(lineName(l))) return true;
+  // OCR can clip a line's first letters ("LLUSTRATION RARE"); the tail of a rarity is still only a rarity.
+  const whole = compactText(l);
+  if (whole.length >= 8 && RARITY.some((w) => compactText(w).endsWith(whole))) return true;
   const spaced = ` ${l.toUpperCase().replace(/[^A-Z0-9& ]/g, " ")} `.replace(/ (II|III|IV) /g, (_, r: string) => ` ${ROMAN[r]} `);
   let c = compactText(spaced);
   const names = [s.nameEn, (s.nameEn ?? "").replace(SUBSET_SUFFIX, ""), (s.nameEn ?? "").replace(/^Base Set/i, "Base"), s.printedCode, ...s.aliases]
