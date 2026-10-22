@@ -9,6 +9,8 @@ import { anonClient } from "@/lib/supabase-server";
 import { loadSetPage } from "@/lib/sets-data";
 import { fmtDateLong } from "@/lib/format";
 export const revalidate = 900;
+// Set pages are built on first visit and cached; none are built ahead at deploy time.
+export async function generateStaticParams() { return []; }
 
 export default async function SetPage({ params }: { params: Promise<{ id: string }> }) {
   const id = decodeURIComponent((await params).id);
