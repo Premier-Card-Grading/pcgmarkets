@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { PcgCert } from "@pcg/domain";
-import { identifySlab, type CertSearch } from "../src/jobs/slabs";
+import { identifySlab, identifyVision, type CertSearch, type VisionRead } from "../src/jobs/slabs";
 
 const LYCANROC = ["PCG", "Lycanroc", "MEGA: 30th Celebration | Alternate Art Illustration Rare", "9.5", "CENTERING", "10", "CORNERS", "10", "EDGES", "9.5", "SURFACE", "Gem Mint", "10", "J 30CEi)138/128"];
 const cert = (o: Partial<PcgCert>): PcgCert => ({ id: "000361156", name: "Lycanroc", set: "MEGA: 30th Celebration", num: "138/128", lang: "English", rarity: "Illustration Rare", fin: 10, c: 9.5, co: 10, e: 10, s: 9.5, grade: "Gem Mint", done: "2026-10-09T00:00:00Z", ...o });
@@ -24,5 +24,22 @@ describe("identifySlab", () => {
   it("makes no lookups for the Chinese 'PCG' slab", async () => {
     const search: CertSearch = async () => { throw new Error("should not search"); };
     expect((await identifySlab(["PPCG", "PROFESSIONAL CARD GRADING", "2024 POKEMON CHN.", "MEW", "049/132", "10875237"], SOLD, search)).status).toBe("chinese_pcg");
+  });
+});
+
+describe("identifyVision", () => {
+  const v = (o: Partial<VisionRead>): VisionRead => ({ premier: true, name: "Lycanroc", set: "MEGA", rarity: "Alternate Art Illustration Rare",
+    centering: 9.5, corners: 10, edges: 10, surface: 9.5, gradeWord: "Gem Mint", finalGrade: 10, cardNumber: "138/128", confidence: "high", ...o });
+  it("looks up a transcribed label, falling back to the card name when the set is too broad to list", async () => {
+    const search: CertSearch = async (p) => { if (p === "setName") throw new Error("got 3000 of 9000"); return [cert({})]; };
+    expect(await identifyVision(v({}), SOLD, search)).toMatchObject({ status: "cert", read: "vision", certs: [{ id: "000361156" }] });
+  });
+  it("needs the card's number to accept a series-only set", async () => {
+    const search: CertSearch = async (p) => (p === "cardName" ? [cert({})] : []);
+    expect((await identifyVision(v({ cardNumber: null }), SOLD, search))!.status).toBe("label_not_in_pcg");
+  });
+  it("ignores readings that are not confident, not Premier, or unnamed", async () => {
+    const search: CertSearch = async () => { throw new Error("should not search"); };
+    for (const o of [{ confidence: "low" as const }, { premier: false }, { name: null }]) expect(await identifyVision(v(o), SOLD, search)).toBeNull();
   });
 });

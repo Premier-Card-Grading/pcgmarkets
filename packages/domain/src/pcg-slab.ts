@@ -45,6 +45,8 @@ export interface SlabFinding {
   /** The agreeing cert(s): one for "cert", all of them for "card_certain_cert_shared". */
   certs: PcgCert[];
   label?: SlabLabel;
+  /** Who read the label: the OCR, or a person or agent transcribing the photo (vision). */
+  read?: "ocr" | "vision";
 }
 
 const GRADE_TOKEN = /^(10|[1-9](\.5)?)\*?$/;
@@ -125,7 +127,12 @@ const plainNumber = (n: string) => n.replace(/0*(\d+)\/0*(\d+)/, "$1/$2");
  * more. `ocrText` is the whole photo's OCR, used to read the number printed on the card itself.
  */
 export function pickCert(label: SlabLabel, candidates: PcgCert[], ocrText: string, soldAt: Date): { status: SlabStatus; certs: PcgCert[] } {
-  const fitting = candidates.filter((c) => certFitsLabel(c, label) && (!c.done || new Date(c.done) <= soldAt));
+  const printed = [...ocrText.matchAll(/(?<![\d/])0*(\d{1,3})\s?\/\s?0*(\d{2,3})(?![\d/])/g)].map((m) => `${m[1]}/${m[2]}`);
+  // Some labels print only the series ("MEGA") for "MEGA: Ascended Heroes": that is only enough
+  // when the number printed on the card is the cert's too.
+  const seriesOnly = (c: PcgCert) => c.set.includes(":") && normText(c.set.split(":")[0]) === normText(label.set)
+    && similarity(c.name, label.name) >= 0.75 && c.num != null && printed.includes(plainNumber(c.num));
+  const fitting = candidates.filter((c) => (certFitsLabel(c, label) || seriesOnly(c)) && (!c.done || new Date(c.done) <= soldAt));
   if (!fitting.length) return { status: "label_not_in_pcg", certs: [] };
   let ids = label.grades.length >= 2 ? fitting.filter((c) => within([c.fin, c.c, c.co, c.e, c.s].filter((v): v is number => v != null), label.grades)) : [];
   // PCG's grade word on the label must be the cert's ("Gem Mint" and "Pristine" are both 10s).
@@ -136,7 +143,6 @@ export function pickCert(label: SlabLabel, candidates: PcgCert[], ocrText: strin
     const r = ids.filter((c) => c.rarity && similarity(c.rarity, label.rarity) >= 0.8);
     if (r.length) ids = r;
   }
-  const printed = [...ocrText.matchAll(/(?<![\d/])0*(\d{1,3})\s?\/\s?0*(\d{2,3})(?![\d/])/g)].map((m) => `${m[1]}/${m[2]}`);
   if (printed.length) {
     const numbered = ids.filter((c) => /\d\/\d/.test(c.num ?? ""));
     if (numbered.length === ids.length && !ids.some((c) => printed.includes(plainNumber(c.num!)))) return { status: "card_number_conflict", certs: [] };

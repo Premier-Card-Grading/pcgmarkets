@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { Job } from "../run";
 import { loadSlabWork, saveSlabFinding } from "@pcg/db";
-import { readSlabLabel, pickCert, similarity, type PcgCert, type SlabFinding } from "@pcg/domain";
+import { readSlabLabel, pickCert, similarity, type PcgCert, type SlabFinding, type SlabLabel } from "@pcg/domain";
 import { searchCerts } from "@pcg/connectors";
 
 const run = promisify(execFile);
@@ -29,7 +29,25 @@ export async function identifySlab(lines: string[], soldAt: Date, search: CertSe
     }
     return { status: "old_label_cert_not_in_pcg", certs: [] };
   }
-  const { label } = read;
+  return { ...(await identifyLabel(read.label, lines.join(" | "), soldAt, search)), read: "ocr" };
+}
+
+/** A label transcribed from the photo by an agent, as written by the vision step. */
+export interface VisionRead {
+  premier: boolean; name: string | null; set: string | null; rarity: string | null;
+  centering: number | null; corners: number | null; edges: number | null; surface: number | null;
+  gradeWord: string | null; finalGrade: number | null; cardNumber: string | null; confidence: "high" | "low";
+}
+
+/** Identifies a slab from a transcribed label. Only a confident, Premier, named reading is looked up. */
+export async function identifyVision(v: VisionRead, soldAt: Date, search: CertSearch): Promise<SlabFinding | null> {
+  if (!v.premier || v.confidence !== "high" || !v.name || !v.set) return null;
+  const grades = [v.centering, v.corners, v.edges, v.surface, v.finalGrade].filter((g): g is number => typeof g === "number");
+  const label: SlabLabel = { name: v.name, set: v.set, rarity: v.rarity, grades, gradeWord: v.gradeWord };
+  return { ...(await identifyLabel(label, v.cardNumber ?? "", soldAt, search)), read: "vision" };
+}
+
+async function identifyLabel(label: SlabLabel, ocrText: string, soldAt: Date, search: CertSearch): Promise<SlabFinding> {
   // The API ANDs a final grade with setName or cardName, but ORs setName with cardName: ask within
   // the label's set for each grade it shows, and by card name only if the OCR'd set finds nothing.
   const grades = [...new Set(label.grades)];
@@ -39,13 +57,14 @@ export async function identifySlab(lines: string[], soldAt: Date, search: CertSe
     return [...byId.values()];
   };
   try {
-    let cands = await ask("setName", label.set);
-    let r = pickCert(label, cands, lines.join(" | "), soldAt);
+    // A series-only set ("MEGA") can match too many certs to list: then search by card name instead.
+    let cands = await ask("setName", label.set).catch(() => [] as PcgCert[]);
+    let r = pickCert(label, cands, ocrText, soldAt);
     if (r.status === "label_not_in_pcg") {
       const words = label.name.split(/\s+/).filter((w) => w.length >= 4).sort((a, b) => b.length - a.length);
       for (const q of [label.name, ...words]) {
         cands = await ask("cardName", q);
-        r = pickCert(label, cands, lines.join(" | "), soldAt);
+        r = pickCert(label, cands, ocrText, soldAt);
         if (r.status !== "label_not_in_pcg") break;
       }
     }
@@ -107,7 +126,11 @@ export function slabsJob(opts: { all: boolean }): Job {
           }
           if (!existsSync(text)) writeFileSync(text, (await run(ocr, [img])).stdout);
           const lines = JSON.parse(readFileSync(text, "utf8")) as string[];
-          finding = await identifySlab(lines, new Date(`${(w.soldAt ?? new Date().toISOString()).slice(0, 10)}T23:59:59Z`), search);
+          const soldAt = new Date(`${(w.soldAt ?? new Date().toISOString()).slice(0, 10)}T23:59:59Z`);
+          // An agent's transcription of the label (vision step), when there is one, replaces the OCR's.
+          const vision = join(CACHE, "slabs", `${w.sourceItemId}.vision.json`);
+          const byVision = existsSync(vision) ? await identifyVision(JSON.parse(readFileSync(vision, "utf8")) as VisionRead, soldAt, search) : null;
+          finding = byVision ?? await identifySlab(lines, soldAt, search);
         }
         await saveSlabFinding(db, w.id, { ...w.metadata, pcg: finding });
         tally[finding.status] = (tally[finding.status] ?? 0) + 1;

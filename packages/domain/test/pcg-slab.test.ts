@@ -44,6 +44,16 @@ describe("pickCert", () => {
     const r = pickCert(label, [cert({ id: "A", num: "113/103" }), cert({ id: "B" })], LYCANROC, SOLD);
     expect(r).toMatchObject({ status: "cert", certs: [{ id: "B" }] });
   });
+  it("accepts a label printing only the series ('MEGA') when the card's printed number agrees", () => {
+    const short = { ...label, set: "MEGA" };
+    expect(pickCert(short, [cert({})], "138/128", SOLD)).toMatchObject({ status: "cert", certs: [{ id: "000000001" }] });
+  });
+  it("does not accept a series-only set without the card's number to back it", () => {
+    const short = { ...label, set: "MEGA" };
+    expect(pickCert(short, [cert({})], "", SOLD).status).toBe("label_not_in_pcg");
+    expect(pickCert(short, [cert({ num: "113/103" })], "138/128", SOLD).status).toBe("label_not_in_pcg");
+    expect(pickCert(short, [cert({ set: "MEGAMI Collection" })], "138/128", SOLD).status).toBe("label_not_in_pcg");
+  });
   it("refuses when the card's printed number disagrees with every cert", () => {
     expect(pickCert(label, [cert({ num: "113/103" })], LYCANROC, SOLD).status).toBe("card_number_conflict");
   });

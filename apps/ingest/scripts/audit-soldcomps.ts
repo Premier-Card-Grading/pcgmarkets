@@ -45,7 +45,10 @@ for (const r of rows) {
   // The number printed on the card in the photo, where the OCR read one.
   const ocrPath = `.cache/slabs/${r.raw_listings.source_item_id}.json`;
   const lines: string[] = existsSync(ocrPath) ? JSON.parse(readFileSync(ocrPath, "utf8")) : [];
-  const seen = lines.join(" ").match(/\b\d{1,3}\s*\/\s*\d{2,3}\b/g) ?? [];
+  // A transcription by the vision step is read over the OCR's, which slips digits (053 for 153).
+  const visionPath = `.cache/slabs/${r.raw_listings.source_item_id}.vision.json`;
+  const visionNumber: string | null = existsSync(visionPath) ? JSON.parse(readFileSync(visionPath, "utf8")).cardNumber ?? null : null;
+  const seen = visionNumber ? [visionNumber] : lines.join(" ").match(/\b\d{1,3}\s*\/\s*\d{2,3}\b/g) ?? [];
   const photo = seen.find((s) => parse(s)?.denom === cn?.denom) ?? seen[0] ?? null;
   if (photo && cn?.denom != null && parse(photo)!.denom === cn.denom && parse(photo)!.num !== cn.num) problems.push("photo shows another number");
   out.push({ item: r.raw_listings.source_item_id, product: r.product_id, problems,
