@@ -170,11 +170,15 @@ const PCG_JA_VINTAGE_SETS: Record<string, string> = {
   "neo darkness and to light": "ja-neo4",
 };
 /**
- * A card name for comparing PCG's with ours: without a trailing bracketed note ("Mega Gardevoir ex (032)"),
+ * Card names compared PCG's against ours: without a trailing bracketed note ("Mega Gardevoir ex (032)"),
  * apostrophes ("Roxies" / "Roxie's") or the delta-species mark ("Ludicolo δ"). The words must still be the same.
  */
-const nameKey = (s: string | null | undefined) =>
-  normText((s ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/['’]/g, "").replace(/\s*δ/g, ""));
+const nameKeys = (s: string | null | undefined) => {
+  const base = (s ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/\s*δ/g, "");
+  // "Kanazawa's Pikachu" is recorded as "Kanazawa Pikachu" and "Roxie's" as "Roxies": both spellings count.
+  return [normText(base.replace(/['’]/g, "")), normText(base.replace(/['’]s\b/g, ""))];
+};
+const sameName = (a: string | null | undefined, b: string | null | undefined) => { const y = nameKeys(b); return nameKeys(a).some((k) => y.includes(k)); };
 /** "S&V: Surging Sparks" -> "Surging Sparks". */
 const setCore = (s: string) => s.replace(/^(S&V|S&S|S&M|XY|BW|MEGA|SV|SWSH|SM|HGSS|DP|Wizards|POP|EX)\s*:\s*/i, "").trim();
 
@@ -190,7 +194,7 @@ export function resolveCert(c: PcgCert, catalog: CatalogIndex): CertResolution {
   // 1st Edition and Shadowless print runs sell far apart from Unlimited; our catalogue has one product for all.
   if (/1st\s*edition|shadowless/i.test(c.set)) return { status: "edition_not_in_catalogue" };
   const n = (c.num ?? "").trim();
-  const named = (ps: ProductRef[]) => ps.filter((p) => nameKey(p.nameEn) === nameKey(c.name));
+  const named = (ps: ProductRef[]) => ps.filter((p) => sameName(p.nameEn, c.name));
   const uniq = (ps: ProductRef[]) => [...new Map(ps.map((p) => [p.id, p])).values()];
   const setName = (p: ProductRef) => catalog.set(p.setId)?.nameEn ?? null;
   // Japanese vintage: the cards print no number, so the one card of that name in PCG's set.

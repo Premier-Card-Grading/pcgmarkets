@@ -49,7 +49,8 @@ for (const r of rows) {
   }
   const lang = /japan/i.test(c.lang ?? "") ? "ja" : "en"; // PCG leaves some English promos blank
   if (lang !== p.language) problems.push("language differs");
-  if (bareName(c.name) !== bareName(p.name_en)) problems.push("name differs");
+  const possessive = (n: string | null) => bareName((n ?? "").replace(/['’]s\b/g, ""));
+  if (bareName(c.name) !== bareName(p.name_en) && possessive(c.name) !== possessive(p.name_en)) problems.push("name differs");
   if (r.grade_value !== c.fin) problems.push("grade differs");
   // The number printed on the card in the photo, where the OCR read one.
   const ocrPath = `.cache/slabs/${r.raw_listings.source_item_id}.json`;

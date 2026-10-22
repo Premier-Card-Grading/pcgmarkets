@@ -118,6 +118,7 @@ describe("resolveCert", () => {
     expect(resolveCert(cert({ name: "Mega Gardevoir ex (032)", set: "MEGA: Black Star Promos", num: "032", lang: null }), catalog)).toMatchObject({ product: { id: "mep-032" } });
     expect(resolveCert(cert({ name: "Ludicolo", set: "EX: Crystal Guardians", num: "6/100" }), catalog)).toMatchObject({ product: { id: "ex14-6" } });
     expect(resolveCert(cert({ name: "Roxies Performance", num: "081/128" }), catalog)).toMatchObject({ product: { id: "30th-081" } });
+    expect(resolveCert(cert({ name: "Roxie Performance", num: "081/128" }), catalog)).toMatchObject({ product: { id: "30th-081" } });
     expect(resolveCert(cert({ name: "Ludicolo ex", set: "EX: Crystal Guardians", num: "6/100" }), catalog).status).toBe("no_product_with_name_and_number");
   });
   it("matches Japanese vintage certs (PCG records the Pokédex number) by the one card of that name in the set", () => {
