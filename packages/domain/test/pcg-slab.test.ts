@@ -81,6 +81,11 @@ describe("resolveCert", () => {
     { id: "me02", printedCode: null, language: "en", cardCount: 94, nameEn: "Phantasmal Flames", nameJa: null, aliases: [] },
     { id: "mep", printedCode: null, language: "en", cardCount: null, nameEn: "MEP Black Star Promos", nameJa: null, aliases: [] },
     { id: "xyp", printedCode: null, language: "en", cardCount: null, nameEn: "XY Black Star Promos", nameJa: null, aliases: [] },
+    { id: "swsh4.5sv", printedCode: null, language: "en", cardCount: 122, nameEn: "Shining Fates Shiny Vault", nameJa: null, aliases: [] },
+    { id: "ecard3", printedCode: null, language: "en", cardCount: 144, nameEn: "Skyridge", nameJa: null, aliases: [] },
+    { id: "ex14", printedCode: null, language: "en", cardCount: 100, nameEn: "Crystal Guardians", nameJa: null, aliases: [] },
+    { id: "PMCG1", printedCode: null, language: "ja", cardCount: 102, nameEn: "Expansion Pack (Base Set)", nameJa: null, aliases: [] },
+    { id: "PMCG2", printedCode: null, language: "ja", cardCount: 48, nameEn: "Pokémon Jungle", nameJa: null, aliases: [] },
   ];
   const p = (id: string, setId: string, num: number | null, denom: number | null, printed: string, nameEn: string): ProductRef => ({ id, setId, numberNum: num, numberDenom: denom, numberSuffix: null, language: "en", numberPrinted: printed, nameEn });
   const catalog = new InMemoryCatalog(sets, [
@@ -88,6 +93,14 @@ describe("resolveCert", () => {
     p("me02-138", "me02", 138, 94, "138/094", "Lycanroc"),
     p("mep-038", "mep", 38, null, "038", "Charmander"),
     p("xyp-XY141", "xyp", null, null, "XY141", "Rayquaza"),
+    p("mep-032", "mep", 32, null, "032", "Mega Gardevoir ex"),
+    p("swsh4.5sv-SV119", "swsh4.5sv", null, null, "SV119", "Ditto VMAX"),
+    p("ecard3-H32", "ecard3", null, null, "H32", "Xatu"),
+    p("ex14-6", "ex14", 6, 100, "6/100", "Ludicolo δ"),
+    p("30th-081", "30th", 81, 128, "081/128", "Roxie's Performance"),
+    { ...p("PMCG1-46", "PMCG1", 46, null, "046", "Kadabra"), language: "ja" },
+    { ...p("PMCG2-60", "PMCG2", 60, null, "060", "Pikachu"), language: "ja" },
+    { ...p("PMCG2-61", "PMCG2", 61, null, "061", "Pikachu"), language: "ja" },
   ]);
   it("matches by language, number total and exact card name", () => {
     expect(resolveCert(cert({}), catalog)).toMatchObject({ status: "matched", product: { id: "30th-138" } });
@@ -95,6 +108,22 @@ describe("resolveCert", () => {
   it("matches PCG's black-star promo sets to ours", () => {
     expect(resolveCert(cert({ name: "Charmander", set: "MEGA: Black Star Promos", num: "038" }), catalog)).toMatchObject({ product: { id: "mep-038" } });
     expect(resolveCert(cert({ name: "Rayquaza", set: "XY: Black Star Promos", num: "XY141", lang: null }), catalog)).toMatchObject({ product: { id: "xyp-XY141" } });
+  });
+  it("reads letter-prefixed numbers (SV119/SV122, H32/H32) and checks the set family", () => {
+    expect(resolveCert(cert({ name: "Ditto VMAX", set: "S&S: Shining Fates", num: "SV119/SV122" }), catalog)).toMatchObject({ status: "matched", product: { id: "swsh4.5sv-SV119" } });
+    expect(resolveCert(cert({ name: "Xatu", set: "Skyridge", num: "H32/H32" }), catalog)).toMatchObject({ product: { id: "ecard3-H32" } });
+    expect(resolveCert(cert({ name: "Xatu", set: "Aquapolis", num: "H32/H32" }), catalog).status).toBe("set_disagrees");
+  });
+  it("ignores a trailing bracketed note, apostrophes and the delta mark in names, never the name itself", () => {
+    expect(resolveCert(cert({ name: "Mega Gardevoir ex (032)", set: "MEGA: Black Star Promos", num: "032", lang: null }), catalog)).toMatchObject({ product: { id: "mep-032" } });
+    expect(resolveCert(cert({ name: "Ludicolo", set: "EX: Crystal Guardians", num: "6/100" }), catalog)).toMatchObject({ product: { id: "ex14-6" } });
+    expect(resolveCert(cert({ name: "Roxies Performance", num: "081/128" }), catalog)).toMatchObject({ product: { id: "30th-081" } });
+    expect(resolveCert(cert({ name: "Ludicolo ex", set: "EX: Crystal Guardians", num: "6/100" }), catalog).status).toBe("no_product_with_name_and_number");
+  });
+  it("matches Japanese vintage certs (PCG records the Pokédex number) by the one card of that name in the set", () => {
+    expect(resolveCert(cert({ name: "Kadabra", set: "Base Set Expansion Pack", num: "No. 064", lang: "Japanese" }), catalog)).toMatchObject({ status: "matched", product: { id: "PMCG1-46" } });
+    expect(resolveCert(cert({ name: "Pikachu", set: "Pokémon Jungle", num: "No. 025", lang: "Japanese" }), catalog).status).toBe("ambiguous_product");
+    expect(resolveCert(cert({ name: "Kadabra", set: "Topsun Blue-Back", num: "No. 064", lang: "Japanese" }), catalog).status).toBe("unparsed_number");
   });
   it("never matches when the card name differs", () => {
     expect(resolveCert(cert({ name: "Lycanroc V" }), catalog).status).toBe("no_product_with_name_and_number");

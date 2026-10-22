@@ -19,7 +19,7 @@ const rows = await selectAll<Row>((f, t) => db.from("listing_matches")
   .eq("state", "matched").eq("raw_listings.source", "soldcomps").order("raw_listing_id").range(f, t));
 
 const parse = (n: string) => { const m = /^\D*0*(\d+)\s*\/\s*0*(\d+)\s*$/.exec(n) ?? /^\D*0*(\d+)/.exec(n); return m ? { num: +m[1]!, denom: m[2] ? +m[2] : null } : null; };
-const bareName = (n: string | null) => normText((n ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/-/g, " "));
+const bareName = (n: string | null) => normText((n ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/['’]/g, "").replace(/\s*δ/g, "").replace(/-/g, " "));
 const card = (c: PcgCert) => `${bareName(c.name)}|${normText(c.set)}|${c.num}|${c.lang ?? ""}`;
 const out: { item: string; product: string; problems: string[]; cert: string; catalogue: string; photo: string | null }[] = [];
 
@@ -27,13 +27,22 @@ for (const r of rows) {
   const p = r.products, f = r.raw_listings.metadata.pcg!, c = f.certs[0]!;
   const problems: string[] = [];
   if (new Set(f.certs.map(card)).size > 1) problems.push(`certs name ${new Set(f.certs.map(card)).size} different cards`);
-  const cn = parse(c.num ?? ""), pn = parse(p.number_printed);
-  if (!cn || !pn || cn.num !== pn.num) problems.push("number differs");
+  // Japanese vintage cards print no number (PCG records the Pokédex number): name and set are the check.
+  const vintage = /^(No\.?\s*|#)\d+$/i.test(c.num ?? "");
+  // Subset numbers: "SV119/SV122" is our "SV119", "H4/H32" our "H04".
+  const sub = /^([A-Za-z]{1,3})0*(\d+)\s*\//.exec(c.num ?? "");
+  const cn = vintage ? null : parse(c.num ?? ""), pn = parse(p.number_printed);
+  if (sub) { const m = /^([A-Za-z]{1,3})0*(\d+)$/.exec(p.number_printed); if (!m || m[1]!.toUpperCase() !== sub[1]!.toUpperCase() || m[2] !== sub[2]) problems.push("number differs"); }
+  else if (vintage) { if (p.language !== "ja" || similarity(p.sets.name_en?.replace(/[().]/g, " "), c.set) < 0.5 && !/expansion pack/i.test(c.set)) problems.push("set differs (vintage)"); }
+  else if (!cn || !pn || cn.num !== pn.num) problems.push("number differs");
   const printed = PRINTED_TOTALS[p.sets.id];
   const setTotal = printed === undefined ? p.sets.card_count : typeof printed === "number" ? printed : null;
   if (cn?.denom != null && cn.denom !== (pn?.denom ?? setTotal)) problems.push("set total differs");
   // Promo numbers carry no total: both sides must be that era's promo set.
-  if (cn?.denom == null) {
+  if (cn?.denom == null && sub) {
+    const ours = normText(p.sets.name_en), theirs = normText(c.set.replace(/^[^:]*:\s*/, ""));
+    if (similarity(ours, theirs) < 0.85 && !ours.startsWith(theirs)) problems.push("set differs (subset)");
+  } else if (cn?.denom == null && !vintage) {
     const era = (s: string) => /wizards|^basep/i.test(s) ? "wotc" : /nintendo|^np /i.test(s) ? "nintendo" : /mega|^me/i.test(s) ? "mega" : /s&v|scarlet|^sv/i.test(s) ? "sv" : /sword|swsh|^s&s/i.test(s) ? "swsh" : /s&m|sun|^sm/i.test(s) ? "sm" : /^xy/i.test(s) ? "xy" : s;
     const promo = (s: string | null) => /promo/i.test(s ?? "");
     if (!promo(c.set) || !promo(p.sets.name_en) || era(c.set) !== era(`${p.sets.id} ${p.sets.name_en}`.replace(/^\S+ /, (m) => m.toLowerCase() === "mep " ? "mega " : m))) problems.push("set differs (promo)");

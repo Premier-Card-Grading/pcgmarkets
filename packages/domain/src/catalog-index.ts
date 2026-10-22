@@ -35,6 +35,8 @@ export interface CatalogIndex {
   productsByLanguageAndNumber(language: Language, num: number): ProductRef[];
   /** Products whose printed number is exactly this (case/space-insensitive), e.g. "XY141". */
   productsByPrinted(language: Language, printed: string): ProductRef[];
+  /** Every product in a set (Japanese vintage cert resolution, where the cards print no number). */
+  productsInSet(setId: string): ProductRef[];
   set(id: string): SetRef | undefined;
 }
 
@@ -52,6 +54,7 @@ export class InMemoryCatalog implements CatalogIndex {
   private bySuffixNum = new Map<string, ProductRef[]>();
   private byLangNum = new Map<string, ProductRef[]>();
   private byPrinted = new Map<string, ProductRef[]>();
+  private bySet = new Map<string, ProductRef[]>();
   private setsById = new Map<string, SetRef>();
   private codes: Record<Language, string[]> = { ja: [], en: [] };
 
@@ -67,6 +70,7 @@ export class InMemoryCatalog implements CatalogIndex {
       for (const n of [s.nameEn, s.nameJa, ...s.aliases]) if (n) push(this.byName, norm(n), s);
     }
     for (const p of products) {
+      push(this.bySet, p.setId, p);
       if (p.numberPrinted) push(this.byPrinted, `${p.language}:${printedKey(p.numberPrinted)}`, p);
       if (p.numberNum == null) continue;
       push(this.byLangNum, `${p.language}:${p.numberNum}`, p);
@@ -93,5 +97,6 @@ export class InMemoryCatalog implements CatalogIndex {
   }
   productsByLanguageAndNumber(language: Language, num: number) { return this.byLangNum.get(`${language}:${num}`) ?? []; }
   productsByPrinted(language: Language, printed: string) { return this.byPrinted.get(`${language}:${printedKey(printed)}`) ?? []; }
+  productsInSet(setId: string) { return this.bySet.get(setId) ?? []; }
   set(id: string) { return this.setsById.get(id); }
 }

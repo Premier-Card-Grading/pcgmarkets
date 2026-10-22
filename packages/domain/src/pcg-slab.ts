@@ -160,6 +160,21 @@ const PCG_PROMO_SETS: Record<string, string> = {
   "s m black star promos": "smp", "sm black star promos": "smp", "s s black star promos": "swshp", "swsh black star promos": "swshp",
   "s v black star promos": "svp", "sv black star promos": "svp", "mega black star promos": "mep",
 };
+/**
+ * PCG's names for the Japanese sets of 1996–2001, whose cards print no card number (PCG records the
+ * Pokédex number, "No. 064") -> our set ids. Sets we don't hold (Carddass, Topsun) are left out.
+ */
+const PCG_JA_VINTAGE_SETS: Record<string, string> = {
+  "base set expansion pack": "PMCG1", "pokemon jungle": "PMCG2", "mystery of the fossils": "PMCG3", "rocket gang": "PMCG4",
+  "neo gold silver to a new world": "ja-neo1", "neo crossing the ruins": "ja-neo2", "neo awakening legends": "ja-neo3",
+  "neo darkness and to light": "ja-neo4",
+};
+/**
+ * A card name for comparing PCG's with ours: without a trailing bracketed note ("Mega Gardevoir ex (032)"),
+ * apostrophes ("Roxies" / "Roxie's") or the delta-species mark ("Ludicolo δ"). The words must still be the same.
+ */
+const nameKey = (s: string | null | undefined) =>
+  normText((s ?? "").replace(/\s*\([^)]*\)\s*$/, "").replace(/['’]/g, "").replace(/\s*δ/g, ""));
 /** "S&V: Surging Sparks" -> "Surging Sparks". */
 const setCore = (s: string) => s.replace(/^(S&V|S&S|S&M|XY|BW|MEGA|SV|SWSH|SM|HGSS|DP|Wizards|POP|EX)\s*:\s*/i, "").trim();
 
@@ -175,14 +190,31 @@ export function resolveCert(c: PcgCert, catalog: CatalogIndex): CertResolution {
   // 1st Edition and Shadowless print runs sell far apart from Unlimited; our catalogue has one product for all.
   if (/1st\s*edition|shadowless/i.test(c.set)) return { status: "edition_not_in_catalogue" };
   const n = (c.num ?? "").trim();
+  const named = (ps: ProductRef[]) => ps.filter((p) => nameKey(p.nameEn) === nameKey(c.name));
+  const uniq = (ps: ProductRef[]) => [...new Map(ps.map((p) => [p.id, p])).values()];
+  const setName = (p: ProductRef) => catalog.set(p.setId)?.nameEn ?? null;
+  // Japanese vintage: the cards print no number, so the one card of that name in PCG's set.
+  const vintage = lang === "ja" && /^(No\.?\s*|#)\d+$/i.test(n) ? PCG_JA_VINTAGE_SETS[normText(c.set)] : undefined;
+  if (vintage) {
+    const ps = named(catalog.productsInSet(vintage));
+    if (ps.length === 1) return { status: "matched", product: ps[0]! };
+    return { status: ps.length ? "ambiguous_product" : "no_product_with_name_and_number" };
+  }
+  // Subset numbers carry a letter prefix: "SV119/SV122", "GG70/GG70", "H4/H32" (we print "SV119", "GG70", "H04").
+  const sub = /^([A-Za-z]{1,3})0*(\d+)\s*\/\s*[A-Za-z]{1,3}\d+$/.exec(n);
+  if (sub) {
+    const [, pre, d] = sub as unknown as [string, string, string];
+    const ps = uniq(named([d, d.padStart(2, "0"), d.padStart(3, "0")].flatMap((x) => catalog.productsByPrinted(lang, `${pre}${x}`))));
+    if (ps.length !== 1) return { status: ps.length ? "ambiguous_product" : "no_product_with_name_and_number" };
+    const ours = normText(setName(ps[0]!)), theirs = normText(setCore(c.set));
+    return similarity(ours, theirs) >= 0.85 || (theirs.length >= 4 && ours.startsWith(theirs)) ? { status: "matched", product: ps[0]! } : { status: "set_disagrees" };
+  }
   let num: number | null = null, denom: number | null = null, suffix: string | null = null, m: RegExpExecArray | null;
   if ((m = /^0*(\d+)\s*\/\s*0*(\d+)$/.exec(n))) { num = +m[1]!; denom = +m[2]!; }
   else if ((m = /^0*(\d+)\s*\/\s*([A-Za-z][\w-]*)$/.exec(n))) { num = +m[1]!; suffix = m[2]!; }
   else if ((m = /^([A-Za-z]+)-?0*(\d+)$/.exec(n))) { num = +m[2]!; suffix = m[1]!; }
   else if ((m = /^0*(\d+)$/.exec(n))) num = +m[1]!;
   if (num == null) return { status: "unparsed_number" };
-  const named = (ps: ProductRef[]) => ps.filter((p) => normText(p.nameEn) === normText(c.name));
-  const uniq = (ps: ProductRef[]) => [...new Map(ps.map((p) => [p.id, p])).values()];
   if (promo) {
     const ps = uniq(named([...catalog.productsByLanguageAndNumber(lang, num), ...catalog.productsByPrinted(lang, n)]).filter((p) => p.setId === promo));
     if (ps.length === 1) return { status: "matched", product: ps[0]! };
@@ -193,7 +225,6 @@ export function resolveCert(c: PcgCert, catalog: CatalogIndex): CertResolution {
   const sameKey = (a: string | null | undefined, b: string) => (a ?? "").toLowerCase().replace(/-/g, "") === b.toLowerCase().replace(/-/g, "");
   let hits = pool.filter((p) => (denom != null && p.numberDenom === denom) || (suffix != null && sameKey(p.numberSuffix, suffix)));
   if (!hits.length) hits = pool;
-  const setName = (p: ProductRef) => catalog.set(p.setId)?.nameEn ?? null;
   if (hits.length > 1) {
     const best = hits.filter((p) => similarity(setName(p), setCore(c.set)) >= 0.85);
     if (best.length) hits = best;
