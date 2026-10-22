@@ -22,7 +22,12 @@ export function gradeOptions(points: PricePointRow[], window: Window): GradeOpti
   for (const p of inWin.filter((p) => Number(p.grade_value) < 10 && p.grade_label === "any").sort((a, b) => Number(b.grade_value) - Number(a.grade_value))) out.push(mk(p, null));
   return out;
 }
+/** A PriceCharting estimate shows while its import is this fresh. */
 export const ESTIMATE_MAX_AGE_DAYS = 14;
+/** A SoldComps estimate shows while its newest PSA sale is within the 90 days its median was taken over. */
+export const SOLDCOMPS_ESTIMATE_MAX_AGE_DAYS = 90;
+export const estimateFresh = (source: string | null | undefined, asOf: string, now: Date) =>
+  now.getTime() - new Date(asOf).getTime() <= (source === "soldcomps" ? SOLDCOMPS_ESTIMATE_MAX_AGE_DAYS : ESTIMATE_MAX_AGE_DAYS) * 86400000;
 /**
  * Estimated grades: only where the card has never had a PCG sale at that grade (any window), and the source is fresh.
  * A grade counts as sold if it has a price point or ANY matched sale, best offers and unpriced sales included.
@@ -32,9 +37,8 @@ export function estimateOptions(points: PricePointRow[], estimates: EstimateRow[
     ...points.filter((p) => p.n_sales > 0).map((p) => Number(p.grade_value)),
     ...sales.filter((s) => s.grade_value != null).map((s) => Number(s.grade_value)),
   ]);
-  const maxAge = ESTIMATE_MAX_AGE_DAYS * 86400000;
   return estimates
-    .filter((e) => !real.has(Number(e.grade_value)) && now.getTime() - new Date(e.source_as_of).getTime() <= maxAge)
+    .filter((e) => !real.has(Number(e.grade_value)) && estimateFresh(e.source, e.source_as_of, now))
     .sort((a, b) => Number(b.grade_value) - Number(a.grade_value))
     .map((e) => {
       const g = Number(e.grade_value), v = Number(e.estimate_usd);

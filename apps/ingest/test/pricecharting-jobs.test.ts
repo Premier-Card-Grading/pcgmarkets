@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   failUpsert: false,
   setMap: null as null | unknown[], pcRows: null as null | unknown[], cands: null as null | unknown[],
   keptPcIds: null as null | string[], consoles: [] as string[], candSets: [] as string[], deletedAuto: 0, linkedForEstimates: null as null | unknown[],
+  psaSales: [] as unknown[],
 }));
 vi.mock("@pcg/db", () => ({
   lastOkImport: async () => state.lastOk,
@@ -33,6 +34,7 @@ vi.mock("@pcg/db", () => ({
     { productId: "nodate-1", language: "en", setId: "x", releaseDate: null, salesVolume: 1, pricesUsd: { "10": 10 }, isOverride: true, consoleName: "Pokemon Other" },
   ],
   loadPcgGradedPairs: async () => new Set(["sv03.5-200|10"]),
+  loadPsaSalesForEstimates: async () => state.psaSales,
   replaceEstimates: async (_db: unknown, rows: unknown[]) => { state.estimates = rows; return rows.length; },
 }));
 
@@ -42,7 +44,7 @@ const { estimatesJob } = await import("../src/jobs/estimates");
 const csv = readFileSync(new URL("../../../packages/connectors/test/fixtures/pricecharting-sample.csv", import.meta.url), "utf8");
 const ctx = { db: {} as never, log: () => {} };
 
-beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, snapshots: [], links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null, keptPcIds: null, consoles: [], candSets: [], deletedAuto: 0, linkedForEstimates: null }); process.env.PRICECHARTING_TOKEN = "t"; });
+beforeEach(() => { Object.assign(state, { lastOk: null, imports: [], upserted: 0, deletedStale: false, snapshots: [], links: [], estimates: [], failUpsert: false, setMap: null, pcRows: null, cands: null, keptPcIds: null, consoles: [], candSets: [], deletedAuto: 0, linkedForEstimates: null, psaSales: [] }); process.env.PRICECHARTING_TOKEN = "t"; });
 
 describe("pricecharting:csv", () => {
   it("imports, marks ok only after the upsert, drops stale rows, and links mapped sets", async () => {
@@ -84,16 +86,26 @@ describe("pricecharting:csv", () => {
 });
 
 describe("estimates", () => {
-  it("is suspect and keeps existing estimates when the latest ok import is older than 7 days", async () => {
+  const psaSale = (gradeValue: number, priceUsd: number, daysAgo: number) => ({ productId: "sv03.5-200", gradeValue, priceUsd, soldAt: new Date(Date.now() - daysAgo * 86400000) });
+  it("is suspect and leaves out PriceCharting prices when the latest ok import is older than 7 days, but still uses SoldComps", async () => {
     state.lastOk = { id: "imp0", fetched_at: new Date(Date.now() - 8 * 86400000).toISOString(), row_count: 7 };
+    state.psaSales = [psaSale(9, 100, 1), psaSale(9, 120, 2), psaSale(9, 140, 3)];
     expect((await estimatesJob(ctx)).suspect).toBe(true);
-    expect(state.estimates).toEqual([]);
+    expect(state.estimates).toMatchObject([{ product_id: "sv03.5-200", grade_value: 9, estimate_usd: 90, source: "soldcomps", import_id: null }]);
   });
-  it("skips graded pairs and cards without an era, and stamps the import", async () => {
+  it("skips graded pairs and cards without an era, and stamps the import, at a flat 75%", async () => {
     const at = new Date().toISOString();
     state.lastOk = { id: "imp1", fetched_at: at, row_count: 7 };
     await estimatesJob(ctx);
-    expect(state.estimates).toEqual([{ product_id: "sv03.5-200", grade_value: 9, estimate_usd: 66, pct: 0.6, era: "modern", import_id: "imp1", source_as_of: at }]);
+    expect(state.estimates).toEqual([{ product_id: "sv03.5-200", grade_value: 9, estimate_usd: 82.5, pct: 0.75, era: "modern", import_id: "imp1", source_as_of: at, source: "pricecharting" }]);
+  });
+  it("prefers SoldComps PSA sales over PriceCharting, dated by the newest sale used", async () => {
+    state.lastOk = { id: "imp1", fetched_at: new Date().toISOString(), row_count: 7 };
+    state.psaSales = [psaSale(9, 100, 1), psaSale(9, 120, 2), psaSale(9, 140, 3)];
+    await estimatesJob(ctx);
+    const e = (state.estimates as { source: string; estimate_usd: number; source_as_of: string; import_id: string | null }[])[0]!;
+    expect(e).toMatchObject({ source: "soldcomps", estimate_usd: 90, import_id: null });
+    expect(new Date(e.source_as_of).getTime()).toBe((state.psaSales[0] as { soldAt: Date }).soldAt.getTime());
   });
   it("ignores auto links whose PriceCharting console is no longer mapped to the card's set, but always keeps overrides", async () => {
     const at = new Date().toISOString();
@@ -110,8 +122,11 @@ describe("estimates", () => {
     expect((state.estimates as { product_id: string }[]).map((e) => e.product_id).sort()).toEqual(["sv03.5-1", "sv03.5-4"]);
     expect(logs).toContain("skipped 2 auto links whose PriceCharting console is no longer mapped to the card's set");
   });
-  it("fails clearly when there has never been an ok import", async () => {
-    await expect(estimatesJob(ctx)).rejects.toThrow("pricecharting:csv");
+  it("runs on SoldComps PSA sales alone when there has never been a PriceCharting import", async () => {
+    state.psaSales = [psaSale(10, 200, 1), psaSale(10, 200, 2), psaSale(10, 220, 3), psaSale(9, 100, 1), psaSale(9, 100, 2), psaSale(9, 100, 3)];
+    expect((await estimatesJob(ctx)).suspect).toBeUndefined();
+    // PCG 10 already has a PCG sale, so only PCG 9 is estimated.
+    expect(state.estimates).toMatchObject([{ product_id: "sv03.5-200", grade_value: 9, estimate_usd: 75, source: "soldcomps", era: null, import_id: null }]);
   });
 });
 

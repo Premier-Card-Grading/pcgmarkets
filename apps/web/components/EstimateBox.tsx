@@ -3,7 +3,7 @@ import { GradeBadge } from "./GradeBadge";
 import { Price } from "./Price";
 import { fmtUsd } from "@/lib/format";
 
-export const ESTIMATE_FOOTNOTE = "Estimated from PSA market prices and card popularity — no PCG sales yet.";
+export const ESTIMATE_FOOTNOTE = "Estimated from PSA market prices — no PCG sales yet.";
 
 /** Visible "Est." that screen readers hear as "Estimated" (abbr title alone is read inconsistently). */
 export function EstMark({ className }: { className?: string }) {

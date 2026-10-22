@@ -12,7 +12,7 @@ describe("EstimateBox", () => {
     const html = renderToStaticMarkup(createElement(EstimateBox, { opt }));
     expect(html).toContain("~$84");
     expect(html).toContain("Est.");
-    expect(ESTIMATE_FOOTNOTE).toBe("Estimated from PSA market prices and card popularity — no PCG sales yet.");
+    expect(ESTIMATE_FOOTNOTE).toBe("Estimated from PSA market prices — no PCG sales yet.");
     expect(html).toContain(ESTIMATE_FOOTNOTE);
   });
   it("expands Est. to 'Estimated' for assistive tech while keeping the visible text", () => {

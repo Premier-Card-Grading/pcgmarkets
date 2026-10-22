@@ -3,6 +3,11 @@ import type { Language } from "./types";
 export type Era = "vintage" | "mid" | "modern";
 export type PcGradeKey = "10" | "9.5" | "9" | "8" | "7" | "6" | "5" | "4" | "3" | "2" | "1";
 
+/**
+ * The share of the PSA price every estimate uses for now (user, 2026-10-23), until there is a way to measure popularity.
+ * The 60–90% popularity ranking below stays for when there is one.
+ */
+export const FLAT_PCT = 0.75;
 export const PCT_MIN = 0.6;
 export const PCT_MAX = 0.9;
 /** A (language, era) group smaller than this can't be ranked meaningfully; its cards get PCT_MIN. */
@@ -12,7 +17,8 @@ export const ERA_BOUNDS = { vintageBefore: "2003-07-01", modernFrom: "2017-01-01
 export const ESTIMATE_GRADES = [10, 9.5, 9, 8.5, 8, 7.5, 7, 6, 5, 4, 3, 2, 1] as const;
 
 export interface EstimateInput { productId: string; language: Language; era: Era; salesVolume: number | null; pricesUsd: Partial<Record<PcGradeKey, number>> }
-export interface Estimate { productId: string; gradeValue: number; estimateUsd: number; pct: number; era: Era }
+export type EstimateSource = "soldcomps" | "pricecharting";
+export interface Estimate { productId: string; gradeValue: number; estimateUsd: number; pct: number; era: Era | null }
 
 export function eraFor(releaseDate: string | null, override: Era | null): Era | null {
   if (override) return override;
@@ -60,7 +66,8 @@ export function dropDuplicateProducts(cards: EstimateInput[]): { unique: Estimat
 
 const round = (x: number, dp: number) => Math.round(x * 10 ** dp) / 10 ** dp;
 
-export function computeEstimates(cards: EstimateInput[], pcgGraded: Set<string>): Estimate[] {
+/** PriceCharting estimates. With `flatPct` every card gets that share; without it, the 60–90% popularity ranking. */
+export function computeEstimates(cards: EstimateInput[], pcgGraded: Set<string>, opts: { flatPct?: number } = {}): Estimate[] {
   const groups = new Map<string, EstimateInput[]>();
   for (const c of cards) {
     const k = `${c.language}|${c.era}`;
@@ -70,7 +77,7 @@ export function computeEstimates(cards: EstimateInput[], pcgGraded: Set<string>)
   for (const g of groups.values()) {
     const ranks = g.length < MIN_GROUP ? g.map(() => 0) : percentileRanks(g.map((c) => c.salesVolume ?? 0));
     g.forEach((c, i) => {
-      const pct = round(PCT_MIN + (PCT_MAX - PCT_MIN) * ranks[i]!, 4);
+      const pct = opts.flatPct ?? round(PCT_MIN + (PCT_MAX - PCT_MIN) * ranks[i]!, 4);
       for (const gradeValue of ESTIMATE_GRADES) {
         if (pcgGraded.has(gradedKey(c.productId, gradeValue))) continue;
         const key = pcKeyForGrade(gradeValue);
@@ -82,3 +89,49 @@ export function computeEstimates(cards: EstimateInput[], pcgGraded: Set<string>)
   }
   return out;
 }
+
+/** A card and grade needs this many priced PSA sales in the last PSA_WINDOW_DAYS for a SoldComps PSA price. */
+export const PSA_MIN_SALES = 3;
+export const PSA_WINDOW_DAYS = 90;
+export interface PsaSale { productId: string; gradeValue: number; priceUsd: number; soldAt: Date }
+export interface PsaGradePrice { productId: string; gradeValue: number; medianUsd: number; nSales: number; newestSoldAt: Date }
+
+/** Median PSA price per card and PSA grade, from priced sales in the last 90 days, where there are at least 3. */
+export function psaGradePrices(sales: PsaSale[], now: Date): PsaGradePrice[] {
+  const since = now.getTime() - PSA_WINDOW_DAYS * 86400000;
+  const groups = new Map<string, PsaSale[]>();
+  for (const s of sales) {
+    if (s.soldAt.getTime() < since || s.soldAt.getTime() > now.getTime() || !(s.priceUsd > 0)) continue;
+    const k = gradedKey(s.productId, s.gradeValue);
+    groups.set(k, [...(groups.get(k) ?? []), s]);
+  }
+  const out: PsaGradePrice[] = [];
+  for (const g of groups.values()) {
+    if (g.length < PSA_MIN_SALES) continue;
+    const xs = g.map((s) => s.priceUsd).sort((a, b) => a - b), mid = Math.floor(xs.length / 2);
+    out.push({ productId: g[0]!.productId, gradeValue: g[0]!.gradeValue, medianUsd: xs.length % 2 ? xs[mid]! : (xs[mid - 1]! + xs[mid]!) / 2,
+      nSales: g.length, newestSoldAt: new Date(Math.max(...g.map((s) => s.soldAt.getTime()))) });
+  }
+  return out;
+}
+
+export type SourcedEstimate = Estimate & { source: EstimateSource; asOf: Date | null };
+
+/**
+ * Both sources together: a SoldComps PSA price always wins over PriceCharting for the same card and grade (user,
+ * 2026-10-23). A PCG grade uses PSA sales of the same grade; PSA has no 9.5, so PCG 9.5 only ever comes from
+ * PriceCharting. Grades with any PCG sale get no estimate. `asOf` is the newest PSA sale used (null for PriceCharting,
+ * whose date is its import's).
+ */
+export function combineEstimates(psa: PsaGradePrice[], pc: Estimate[], pcgGraded: Set<string>, pct: number): SourcedEstimate[] {
+  const out = new Map<string, SourcedEstimate>();
+  for (const e of pc) if (!pcgGraded.has(gradedKey(e.productId, e.gradeValue))) out.set(gradedKey(e.productId, e.gradeValue), { ...e, source: "pricecharting", asOf: null });
+  for (const p of psa) {
+    const k = gradedKey(p.productId, p.gradeValue);
+    if (pcgGraded.has(k) || !(ESTIMATE_GRADES as readonly number[]).includes(p.gradeValue)) continue;
+    const era = out.get(k)?.era ?? null;
+    out.set(k, { productId: p.productId, gradeValue: p.gradeValue, estimateUsd: Math.min(round(p.medianUsd * pct, 2), p.medianUsd), pct, era, source: "soldcomps", asOf: p.newestSoldAt });
+  }
+  return [...out.values()];
+}
+

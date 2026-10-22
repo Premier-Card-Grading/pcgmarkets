@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { eraFor, pcKeyForGrade, percentileRanks, computeEstimates, dropDuplicateProducts, gradedKey, MIN_GROUP, type EstimateInput } from "../src/estimate";
+import { eraFor, pcKeyForGrade, percentileRanks, computeEstimates, dropDuplicateProducts, gradedKey, psaGradePrices, combineEstimates, FLAT_PCT, MIN_GROUP, type EstimateInput } from "../src/estimate";
 
 const card = (i: number, vol: number | null, prices: EstimateInput["pricesUsd"] = { "10": 100, "9": 50 }, over: Partial<EstimateInput> = {}): EstimateInput =>
   ({ productId: `p${i}`, language: "en", era: "modern", salesVolume: vol, pricesUsd: prices, ...over });
@@ -92,3 +92,41 @@ describe("dropDuplicateProducts", () => {
     expect(r.duplicates).toEqual(["p1"]);
   });
 });
+
+describe("psaGradePrices", () => {
+  const now = new Date("2026-10-23T00:00:00Z");
+  const sale = (priceUsd: number, daysAgo = 1, gradeValue = 10, productId = "sv10-229") => ({ productId, gradeValue, priceUsd, soldAt: new Date(now.getTime() - daysAgo * 86400000) });
+  it("takes the median of 3+ priced sales of one card and grade in the last 90 days", () => {
+    expect(psaGradePrices([sale(100, 1), sale(120, 5), sale(300, 80)], now)).toEqual([{ productId: "sv10-229", gradeValue: 10, medianUsd: 120, nSales: 3, newestSoldAt: new Date(now.getTime() - 86400000) }]);
+  });
+  it("needs 3 sales, ignores sales older than 90 days and unpriced ones, and keeps grades apart", () => {
+    expect(psaGradePrices([sale(100), sale(120)], now)).toEqual([]);
+    expect(psaGradePrices([sale(100), sale(120), sale(130, 91)], now)).toEqual([]);
+    expect(psaGradePrices([sale(100), sale(120), sale(0)], now)).toEqual([]);
+    expect(psaGradePrices([sale(100), sale(120), sale(130, 1, 9)], now)).toEqual([]);
+  });
+});
+
+describe("combineEstimates", () => {
+  const psa = (productId: string, gradeValue: number, medianUsd: number) => ({ productId, gradeValue, medianUsd, nSales: 3, newestSoldAt: new Date("2026-10-20T00:00:00Z") });
+  const pc = (productId: string, gradeValue: number, estimateUsd: number) => ({ productId, gradeValue, estimateUsd, pct: FLAT_PCT, era: "modern" as const });
+  it("uses 75% of the SoldComps PSA median, over PriceCharting for the same card and grade", () => {
+    const out = combineEstimates([psa("a", 10, 200)], [pc("a", 10, 90), pc("a", 9, 40)], new Set(), FLAT_PCT);
+    expect(out.find((e) => e.gradeValue === 10)).toMatchObject({ estimateUsd: 150, pct: 0.75, source: "soldcomps", era: "modern" });
+    expect(out.find((e) => e.gradeValue === 9)).toMatchObject({ estimateUsd: 40, source: "pricecharting", asOf: null });
+  });
+  it("gives no estimate for a grade with a PCG sale, from either source", () => {
+    expect(combineEstimates([psa("a", 10, 200)], [pc("a", 9, 40)], new Set([gradedKey("a", 10), gradedKey("a", 9)]), FLAT_PCT)).toEqual([]);
+  });
+  it("uses SoldComps alone when there is no PriceCharting", () => {
+    expect(combineEstimates([psa("b", 9, 80)], [], new Set(), FLAT_PCT)).toEqual([{ productId: "b", gradeValue: 9, estimateUsd: 60, pct: 0.75, era: null, source: "soldcomps", asOf: new Date("2026-10-20T00:00:00Z") }]);
+  });
+});
+
+describe("computeEstimates with a flat share", () => {
+  it("gives every card the same share, whatever its popularity", () => {
+    const out = computeEstimates([card(1, 0, { "10": 100 }), card(2, 999, { "10": 100 })], new Set(), { flatPct: FLAT_PCT });
+    expect(out.map((e) => [e.estimateUsd, e.pct])).toEqual([[75, 0.75], [75, 0.75]]);
+  });
+});
+

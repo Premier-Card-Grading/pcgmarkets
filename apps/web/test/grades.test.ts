@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { gradeOptions, defaultGradeKey, salesFor, deltaPct, rollingMedian, niceStep, gradeKey, gradeLabel, estimateOptions, ESTIMATE_MAX_AGE_DAYS } from "../lib/grades";
+import { gradeOptions, defaultGradeKey, salesFor, deltaPct, rollingMedian, niceStep, gradeKey, gradeLabel, estimateOptions, ESTIMATE_MAX_AGE_DAYS, SOLDCOMPS_ESTIMATE_MAX_AGE_DAYS } from "../lib/grades";
 import type { EstimateRow, PricePointRow, SaleRow } from "../lib/card-data";
 const pt = (grade_value: number, grade_label: string, n_sales: number, window = "90d"): PricePointRow => ({ product_id: "x", grade_value, grade_label, window, n_sales, median_usd: 100, min_usd: 90, max_usd: 110, last_sold_at: "2026-09-01", confidence: "med" });
 const now = new Date("2026-09-21T00:00:00Z");
@@ -60,6 +60,11 @@ describe("estimate options", () => {
   });
   it("treats a sale with no USD price as real too", () => {
     expect(estimateOptions([], [est(8, 30)], now, [{ ...sale(5, 30, 8), price_usd: null }])).toEqual([]);
+  });
+  it("keeps a SoldComps estimate while its newest PSA sale is within 90 days", () => {
+    const sc = (daysOld: number): EstimateRow => ({ ...est(10, 84, daysOld), source: "soldcomps" });
+    expect(estimateOptions([], [sc(ESTIMATE_MAX_AGE_DAYS + 30)], now)).toHaveLength(1);
+    expect(estimateOptions([], [sc(SOLDCOMPS_ESTIMATE_MAX_AGE_DAYS + 1)], now)).toEqual([]);
   });
   it("drops estimates older than ESTIMATE_MAX_AGE_DAYS", () => {
     expect(estimateOptions([], [est(10, 84, ESTIMATE_MAX_AGE_DAYS + 1)], now)).toEqual([]);

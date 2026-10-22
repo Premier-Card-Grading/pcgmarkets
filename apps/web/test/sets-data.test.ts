@@ -31,6 +31,8 @@ describe("sets-data", () => {
     expect(tilePrice(card({ est10_usd: 90, est10_as_of: "2026-10-20T00:00:00Z" }), now)).toEqual({ kind: "estimate", usd: 90 });
     expect(tilePrice(card({ est10_usd: 90, est10_as_of: "2026-09-01T00:00:00Z" }), now)).toEqual({ kind: "none" });
     expect(tilePrice(card({}), now)).toEqual({ kind: "none" });
+    // A SoldComps estimate lasts as long as its 90-day sales window.
+    expect(tilePrice(card({ est10_usd: 90, est10_as_of: "2026-09-01T00:00:00Z", est10_source: "soldcomps" }), now)).toEqual({ kind: "estimate", usd: 90 });
   });
   it("falls back to the card's other PCG grade before any estimate, as the card page does", () => {
     const g95 = { top_grade: 9.5, top_median_usd: 196.875, top_n_sales: 2 };
