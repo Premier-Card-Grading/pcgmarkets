@@ -12,28 +12,33 @@ function Toggle<T extends string>({ value, options, onChange, label }: { value: 
   </div>);
 }
 
-/** What to say when the grid is empty: a search that found nothing, or the "With sales" filter on a set with no sales. */
-export function emptyGridMessage(q: string, only: "all" | "sales"): string {
+export type GridFilter = "priced" | "all";
+
+/** What to say when the grid is empty: a search that found nothing, or the "With prices" filter on a set with none. */
+export function emptyGridMessage(q: string, only: GridFilter): string {
   const t = q.trim();
   if (t) return `No cards match “${t}”.`;
-  return only === "sales" ? "No cards with sales yet." : "No cards in this set yet.";
+  return only === "priced" ? "No cards with prices yet." : "No cards in this set yet.";
 }
 
+/** The grid opens on cards with a PCG price or an estimate, unless the set has none, when it opens on every card. */
+export const defaultGridFilter = (pricedCount: number): GridFilter => (pricedCount > 0 ? "priced" : "all");
+
 export function SetCardGrid({ cards, setCode, now }: { cards: SetCard[]; setCode: string | null; now: string }) {
-  const [q, setQ] = useState(""); const [only, setOnly] = useState<"all" | "sales">("all"); const [by, setBy] = useState<"number" | "price">("number");
   const nowD = useMemo(() => new Date(now), [now]);
-  const withSales = useMemo(() => cards.filter((c) => c.sale_count > 0).length, [cards]);
+  const priced = useMemo(() => new Set(cards.filter((c) => tilePrice(c, nowD).kind !== "none").map((c) => c.id)), [cards, nowD]);
+  const [q, setQ] = useState(""); const [only, setOnly] = useState<GridFilter>(() => defaultGridFilter(priced.size)); const [by, setBy] = useState<"number" | "price">("number");
   const shown = useMemo(() => {
     const query = parseCardQuery(q);
-    return sortCards(cards.filter((c) => (only === "all" || c.sale_count > 0) && matchesCardQuery(c, query)), by, nowD);
-  }, [cards, q, only, by, nowD]);
+    return sortCards(cards.filter((c) => (only === "all" || priced.has(c.id)) && matchesCardQuery(c, query)), by, nowD);
+  }, [cards, q, only, by, nowD, priced]);
   return (<>
     <div className="mb-4 flex flex-wrap items-center gap-2.5">
       <label className="flex min-h-11 w-full max-w-[420px] flex-1 items-center gap-2 rounded-xl border border-line bg-surface px-3 focus-within:border-teal focus-within:ring-[3px] focus-within:ring-teal-soft">
         <Search size={16} className="text-mute" aria-hidden /><span className="sr-only">Find a card</span>
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Card # (069/187, 69) or name" inputMode="search" className="w-full bg-transparent text-[15px] outline-none placeholder:text-mute" />
       </label>
-      <Toggle label="Show" value={only} onChange={setOnly} options={[{ value: "all", label: `All ${cards.length}` }, { value: "sales", label: `With sales ${withSales}` }]} />
+      <Toggle label="Show" value={only} onChange={setOnly} options={[{ value: "priced", label: `With prices ${priced.size}` }, { value: "all", label: `All ${cards.length}` }]} />
       <Toggle label="Sort" value={by} onChange={setBy} options={[{ value: "number", label: "Number" }, { value: "price", label: "Price" }]} />
     </div>
     {shown.length === 0
