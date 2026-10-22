@@ -14,13 +14,14 @@ function withStoredNames(log: (m: string) => void, stored: Map<string, ProductRo
 }
 
 /**
- * C1: TCGdex has no image -> keep the stored one (pokemontcg.io from images:en). A stored local copy (images:mirror) is
- * also kept over TCGdex's remote URL. Keys stay on every row: a batch upsert nulls missing keys.
+ * C1: TCGdex has no image -> keep the stored one (pokemontcg.io from images:en). Our own copy in storage (images:mirror)
+ * is also kept over TCGdex's remote URL. Keys stay on every row: a batch upsert nulls missing keys.
  */
+const isOurCopy = (url: string) => url.includes("/storage/v1/object/public/card-images/");
 const withStoredImages = (stored: Map<string, ProductRow>, rows: ProductRow[]): ProductRow[] =>
   rows.map((r) => {
     const old = stored.get(r.id);
-    const keep = old?.image_url != null && (r.image_url == null || old.image_url.startsWith("/"));
+    const keep = old?.image_url != null && (r.image_url == null || isOurCopy(old.image_url));
     return keep ? { ...r, image_url: old!.image_url, image_source: old!.image_source ?? null } : r;
   });
 

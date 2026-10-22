@@ -25,7 +25,7 @@ const stored: Record<string, Record<string, unknown>[]> = {
   sv1: [
     row({ id: "sv1-001", set_id: "sv1", name_en: "Pineco", name_ja: null, language: "en", number_denom: 198, image_url: "https://images.pokemontcg.io/sv1/1_hires.png", image_source: "pokemontcg" }),
     row({ id: "sv1-002", set_id: "sv1", name_en: "Forretress", name_ja: null, language: "en", number_denom: 198, image_url: "https://images.pokemontcg.io/sv1/2_hires.png", image_source: "pokemontcg" }),
-    row({ id: "sv1-004", set_id: "sv1", name_en: "Scizor", name_ja: null, language: "en", number_denom: 198, image_url: "/card-images/en/sv1/sv1-004.webp", image_source: "tcgdex" }),
+    row({ id: "sv1-004", set_id: "sv1", name_en: "Scizor", name_ja: null, language: "en", number_denom: 198, image_url: "https://x.supabase.co/storage/v1/object/public/card-images/en/sv1/sv1-004.webp?v=sm", image_source: "tcgdex" }),
   ],
 };
 const upserts: { table: string; rows: Record<string, unknown>[] }[] = [];
@@ -66,7 +66,7 @@ describe("catalog:tcgdex", () => {
   });
 
   it("C1: keeps our own copy of an image (images:mirror) over TCGdex's remote URL", () => {
-    expect(products().find((p) => p.id === "sv1-004")).toMatchObject({ image_url: "/card-images/en/sv1/sv1-004.webp", image_source: "tcgdex" });
+    expect(products().find((p) => p.id === "sv1-004")).toMatchObject({ image_url: "https://x.supabase.co/storage/v1/object/public/card-images/en/sv1/sv1-004.webp?v=sm", image_source: "tcgdex" });
   });
 
   it("still writes TCGdex-owned set rows", () => {
