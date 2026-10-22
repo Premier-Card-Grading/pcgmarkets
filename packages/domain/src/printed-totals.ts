@@ -11,8 +11,9 @@
  * Sets not listed here keep the catalogue's count. Add a set only from the printed cards, never from a card count.
  */
 export const PRINTED_TOTALS: Readonly<Record<string, number | string | null>> = {
-  // English: Black Star promos print no total.
-  "svp": null,
+  // English: Black Star promos print no total. Wizards and Nintendo promos read from the cards 2026-10-22
+  // (Wizards prints "34", Nintendo "012"), and PCG's certs record them the same way.
+  "svp": null, "basep": null, "np": null,
   // Japanese original era and Neo (1996–2001): the cards print no number at all; the catalogue's order is ours.
   "PMCG1": null, "PMCG2": null, "PMCG3": null, "PMCG4": null, "PMCG5": null, "PMCG6": null,
   "ja-neo1": null, "ja-neo2": null, "ja-neo3": null, "ja-neo4": null,
@@ -282,3 +283,6 @@ export const PRINTED_TOTALS: Readonly<Record<string, number | string | null>> = 
   "XYP": "XY-P",
   "Y30": 14,
 };
+
+/** Sets whose cards print no total but pad the number to a fixed width ("012"), keyed by set id. */
+export const PRINTED_WIDTHS: Readonly<Record<string, number>> = { "np": 3 };

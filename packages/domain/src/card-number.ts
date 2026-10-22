@@ -1,4 +1,4 @@
-import { PRINTED_TOTALS } from "./printed-totals";
+import { PRINTED_TOTALS, PRINTED_WIDTHS } from "./printed-totals";
 
 export interface ParsedNumber {
   num: number;
@@ -49,6 +49,6 @@ export function numberFromCatalog(
     return { num, denom: null, suffix, printed: `${localId}/${suffix}` };
   }
   const denom = printedTotal === undefined ? set.cardCountOfficial : printedTotal;
-  if (denom == null) return { num, denom: null, suffix: null, printed: localId };
+  if (denom == null) return { num, denom: null, suffix: null, printed: localId.padStart(PRINTED_WIDTHS[set.id] ?? 0, "0") };
   return { num, denom, suffix: null, printed: `${localId}/${String(denom).padStart(localId.length, "0")}` };
 }

@@ -65,6 +65,10 @@ describe("numberFromCatalog", () => {
     expect(numberFromCatalog("001", { id: "svp", cardCountOfficial: 225 }))
       .toEqual({ num: 1, denom: null, suffix: null, printed: "001" });
   });
+  it("prints Wizards promos bare and Nintendo promos as three digits, as on the cards", () => {
+    expect(numberFromCatalog("34", { id: "basep", cardCountOfficial: 53 })).toEqual({ num: 34, denom: null, suffix: null, printed: "34" });
+    expect(numberFromCatalog("12", { id: "np", cardCountOfficial: 40 })).toEqual({ num: 12, denom: null, suffix: null, printed: "012" });
+  });
   it("prints no total for Japanese original-era and Neo cards, which print no number", () => {
     expect(numberFromCatalog("001", { id: "PMCG1", cardCountOfficial: 102 })).toEqual({ num: 1, denom: null, suffix: null, printed: "001" });
     expect(numberFromCatalog("010", { id: "ja-neo4", cardCountOfficial: 113 })!.denom).toBeNull();
