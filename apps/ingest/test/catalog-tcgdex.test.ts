@@ -10,6 +10,7 @@ const en = { id: "sv1", name: "Scarlet & Violet", releaseDate: "2023-03-31", car
   { id: "sv1-001", localId: "001", name: "Pineco", image: null },
   { id: "sv1-002", localId: "002", name: "Forretress", image: "https://assets.tcgdex.net/en/sv/sv1/002" },
   { id: "sv1-003", localId: "003", name: "Scyther", image: null },
+  { id: "sv1-004", localId: "004", name: "Scizor", image: "https://assets.tcgdex.net/en/sv/sv1/004" },
 ] };
 vi.mock("@pcg/connectors", async (orig) => {
   const real = await orig<typeof import("@pcg/connectors")>();
@@ -24,6 +25,7 @@ const stored: Record<string, Record<string, unknown>[]> = {
   sv1: [
     row({ id: "sv1-001", set_id: "sv1", name_en: "Pineco", name_ja: null, language: "en", number_denom: 198, image_url: "https://images.pokemontcg.io/sv1/1_hires.png", image_source: "pokemontcg" }),
     row({ id: "sv1-002", set_id: "sv1", name_en: "Forretress", name_ja: null, language: "en", number_denom: 198, image_url: "https://images.pokemontcg.io/sv1/2_hires.png", image_source: "pokemontcg" }),
+    row({ id: "sv1-004", set_id: "sv1", name_en: "Scizor", name_ja: null, language: "en", number_denom: 198, image_url: "/card-images/en/sv1/sv1-004.webp", image_source: "tcgdex" }),
   ],
 };
 const upserts: { table: string; rows: Record<string, unknown>[] }[] = [];
@@ -61,6 +63,10 @@ describe("catalog:tcgdex", () => {
     expect(byId.get("sv1-002")).toMatchObject({ image_url: "https://assets.tcgdex.net/en/sv/sv1/002/high.webp", image_source: "tcgdex" });
     // every row in a batch carries the image keys (supabase-js fills missing keys with null across a batch)
     expect(byId.get("sv1-003")).toMatchObject({ image_url: null, image_source: null });
+  });
+
+  it("C1: keeps our own copy of an image (images:mirror) over TCGdex's remote URL", () => {
+    expect(products().find((p) => p.id === "sv1-004")).toMatchObject({ image_url: "/card-images/en/sv1/sv1-004.webp", image_source: "tcgdex" });
   });
 
   it("still writes TCGdex-owned set rows", () => {

@@ -4,6 +4,7 @@ import { catalogTcgdex } from "./jobs/catalog-tcgdex";
 import { catalogLimitless } from "./jobs/catalog-limitless";
 import { imagesJa } from "./jobs/images-ja";
 import { imagesEn } from "./jobs/images-en";
+import { imagesMirror } from "./jobs/images-mirror";
 import { fxDaily } from "./jobs/fx-daily";
 import { ebaySold } from "./jobs/ebay-sold";
 import { yahooAuctionsJob } from "./jobs/yahoo-auctions";
@@ -21,6 +22,7 @@ const jobs = {
   "catalog:limitless": catalogLimitless,
   "images:ja": imagesJa({ size: flags.includes("--size") && flags[flags.indexOf("--size") + 1] === "lg" ? "LG" : "SM" }),
   "images:en": imagesEn,
+  "images:mirror": imagesMirror(),
   "fx:daily": fxDaily,
   "ebay:sold": ebaySold,
   "yahoo:auctions": yahooAuctionsJob,

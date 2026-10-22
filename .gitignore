@@ -12,3 +12,4 @@ coverage/
 *.tsbuildinfo
 spikes/out/
 apps/ingest/.cache/
+apps/web/public/card-images/

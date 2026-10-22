@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { hostname: "assets.tcgdex.net" },
       { hostname: "images.pokemontcg.io" },
+      // pokemontcg.io now hands out scrydex image links for new sets (until images:mirror copies them).
+      { hostname: "images.scrydex.com" },
       { hostname: new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://example.supabase.co").hostname, pathname: "/storage/v1/object/public/**" },
     ],
   },

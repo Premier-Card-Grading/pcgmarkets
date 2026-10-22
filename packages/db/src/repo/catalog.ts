@@ -81,3 +81,13 @@ export async function loadEnMissingImages(db: Db) {
 export async function setCardImageFrom(db: Db, productId: string, url: string, source: "pokemontcg") {
   must(await db.from("products").update({ image_url: url, image_source: source }).eq("id", productId));
 }
+
+/** Cards whose image is still on a third-party host (not our storage or our own files). */
+export async function loadRemoteImageWork(db: Db): Promise<{ id: string; set_id: string; language: Language; image_url: string }[]> {
+  return selectAll((f, t) => db.from("products").select("id,set_id,language,image_url").like("image_url", "http%").not("image_url", "like", "%.supabase.co/%").order("id").range(f, t));
+}
+/** Points a card at our own copy of its image, remembering the original. */
+export async function setMirroredImage(db: Db, productId: string, localUrl: string, originUrl: string) {
+  must(await db.from("products").update({ image_url: localUrl, image_origin_url: originUrl }).eq("id", productId));
+}
+
