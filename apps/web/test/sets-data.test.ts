@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { asLang, groupBySeries, filterTiles, tilePrice, sortCards, type SetTile, type SetCard } from "../lib/sets-data";
 
 const tile = (o: Partial<SetTile>): SetTile => ({ id: "x", code: null, nameEn: null, nameJa: null, displayName: "x", releaseDate: null, cardCount: 0, officialCount: null, hasCards: true, logoUrl: null, series: null, saleCount: 0, aliases: [], ...o });
-const card = (o: Partial<SetCard>): SetCard => ({ id: "c", number_printed: "001/100", number_num: 1, number_denom: 100, number_suffix: null, name_en: null, name_ja: null, rarity: null, image_url: null, pcg10_median_usd: null, pcg10_n_sales: null, est10_usd: null, est10_as_of: null, sale_count: 0, ...o });
+const card = (o: Partial<SetCard>): SetCard => ({ id: "c", number_printed: "001/100", number_num: 1, number_denom: 100, number_suffix: null, name_en: null, name_ja: null, rarity: null, image_url: null, pcg10_median_usd: null, pcg10_n_sales: null, est10_usd: null, est10_as_of: null, top_grade: null, top_median_usd: null, top_n_sales: null, sale_count: 0, ...o });
 const now = new Date("2026-10-21T00:00:00Z");
 
 describe("sets-data", () => {
@@ -27,10 +27,16 @@ describe("sets-data", () => {
     expect(filterTiles(t, " ")).toHaveLength(2);
   });
   it("prices tiles: PCG 10, then a fresh estimate, then none", () => {
-    expect(tilePrice(card({ pcg10_median_usd: 120, pcg10_n_sales: 3, est10_usd: 90, est10_as_of: "2026-10-20T00:00:00Z" }), now)).toEqual({ kind: "pcg", usd: 120, nSales: 3 });
+    expect(tilePrice(card({ pcg10_median_usd: 120, pcg10_n_sales: 3, est10_usd: 90, est10_as_of: "2026-10-20T00:00:00Z" }), now)).toEqual({ kind: "pcg", grade: 10, usd: 120, nSales: 3 });
     expect(tilePrice(card({ est10_usd: 90, est10_as_of: "2026-10-20T00:00:00Z" }), now)).toEqual({ kind: "estimate", usd: 90 });
     expect(tilePrice(card({ est10_usd: 90, est10_as_of: "2026-09-01T00:00:00Z" }), now)).toEqual({ kind: "none" });
     expect(tilePrice(card({}), now)).toEqual({ kind: "none" });
+  });
+  it("falls back to the card's other PCG grade before any estimate, as the card page does", () => {
+    const g95 = { top_grade: 9.5, top_median_usd: 196.875, top_n_sales: 2 };
+    expect(tilePrice(card(g95), now)).toEqual({ kind: "pcg", grade: 9.5, usd: 196.875, nSales: 2 });
+    expect(tilePrice(card({ ...g95, est10_usd: 300, est10_as_of: "2026-10-20T00:00:00Z" }), now)).toEqual({ kind: "pcg", grade: 9.5, usd: 196.875, nSales: 2 });
+    expect(tilePrice(card({ ...g95, pcg10_median_usd: 400, pcg10_n_sales: 1 }), now)).toEqual({ kind: "pcg", grade: 10, usd: 400, nSales: 1 });
   });
   it("sorts by number, or by price with no-comps last", () => {
     const cs = [card({ id: "a", number_num: 3 }), card({ id: "b", number_num: 1, est10_usd: 50, est10_as_of: "2026-10-20T00:00:00Z" }), card({ id: "c", number_num: 2, pcg10_median_usd: 80, pcg10_n_sales: 1 })];

@@ -6,8 +6,8 @@ export const asLang = (v: string | undefined): Lang => (v === "ja" ? "ja" : "en"
 
 export interface SetTile { id: string; code: string | null; nameEn: string | null; nameJa: string | null; displayName: string; releaseDate: string | null; cardCount: number | null; officialCount: number | null; hasCards: boolean; logoUrl: string | null; series: string | null; saleCount: number; aliases: string[] }
 export interface SeriesGroup { series: string; sets: SetTile[] }
-export interface SetCard { id: string; number_printed: string; number_num: number | null; number_denom: number | null; number_suffix: string | null; name_en: string | null; name_ja: string | null; rarity: string | null; image_url: string | null; pcg10_median_usd: number | null; pcg10_n_sales: number | null; est10_usd: number | null; est10_as_of: string | null; sale_count: number }
-export type TilePrice = { kind: "pcg"; usd: number; nSales: number } | { kind: "estimate"; usd: number } | { kind: "none" };
+export interface SetCard { id: string; number_printed: string; number_num: number | null; number_denom: number | null; number_suffix: string | null; name_en: string | null; name_ja: string | null; rarity: string | null; image_url: string | null; pcg10_median_usd: number | null; pcg10_n_sales: number | null; est10_usd: number | null; est10_as_of: string | null; top_grade: number | null; top_median_usd: number | null; top_n_sales: number | null; sale_count: number }
+export type TilePrice = { kind: "pcg"; grade: number; usd: number; nSales: number } | { kind: "estimate"; usd: number } | { kind: "none" };
 
 interface SetDbRow { id: string; printed_code: string | null; name_en: string | null; name_ja: string | null; release_date: string | null; card_count: number | null; logo_url: string | null; series: string | null; aliases: string[] | null; language: Lang; products: { count: number }[] }
 const SET_COLS = "id,printed_code,name_en,name_ja,release_date,card_count,logo_url,series,aliases,language,products(count)";
@@ -34,7 +34,9 @@ export function filterTiles(tiles: SetTile[], q: string): SetTile[] {
 }
 
 export function tilePrice(c: SetCard, now: Date): TilePrice {
-  if (c.pcg10_median_usd != null && (c.pcg10_n_sales ?? 0) > 0) return { kind: "pcg", usd: Number(c.pcg10_median_usd), nSales: c.pcg10_n_sales! };
+  if (c.pcg10_median_usd != null && (c.pcg10_n_sales ?? 0) > 0) return { kind: "pcg", grade: 10, usd: Number(c.pcg10_median_usd), nSales: c.pcg10_n_sales! };
+  // No 10: the grade the card page opens on, since real sales at any grade beat an estimate.
+  if (c.top_grade != null && c.top_median_usd != null && (c.top_n_sales ?? 0) > 0) return { kind: "pcg", grade: Number(c.top_grade), usd: Number(c.top_median_usd), nSales: c.top_n_sales! };
   const fresh = c.est10_as_of != null && now.getTime() - new Date(c.est10_as_of).getTime() <= ESTIMATE_MAX_AGE_DAYS * 86400000;
   if (c.est10_usd != null && fresh) return { kind: "estimate", usd: Number(c.est10_usd) };
   return { kind: "none" };

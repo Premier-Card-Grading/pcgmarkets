@@ -5,7 +5,7 @@ import { fmtUsd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export function priceLine(p: TilePrice): string {
-  if (p.kind === "pcg") return `${fmtUsd(p.usd)} · PCG 10 · ${p.nSales} sale${p.nSales === 1 ? "" : "s"}`;
+  if (p.kind === "pcg") return `${fmtUsd(p.usd)} · PCG ${p.grade} · ${p.nSales} sale${p.nSales === 1 ? "" : "s"}`;
   if (p.kind === "estimate") return `~${fmtUsd(p.usd)} est.`;
   return "No comps yet";
 }
